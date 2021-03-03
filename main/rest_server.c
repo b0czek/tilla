@@ -14,6 +14,8 @@
 #include "esp_vfs.h"
 #include "cJSON.h"
 
+#include "esp_network.h"
+
 static const char *REST_TAG = "esp-rest";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
     do                                                                                 \
@@ -51,13 +53,50 @@ static esp_err_t temperature_data_get_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-/* Handler for getting uptime */
-static esp_err_t uptime_data_get_handler(httpd_req_t *req)
+/* Handler for getting info about device */
+static esp_err_t device_data_get_handler(httpd_req_t *req)
 {
 
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "uptime", esp_timer_get_time() / 1000); // return uptime in milliseconds
+
+    int network_interfaces_count = 0;
+#ifdef CONFIG_CONNECT_ETHERNET
+    network_interfaces_count++;
+#endif
+#ifdef CONFIG_CONNECT_WIFI
+    network_interfaces_count++;
+#endif
+    esp_network_info_t *interfaces_info = malloc(network_interfaces_count * sizeof(esp_network_info_t));
+    // get_esp_network_info(interfaces_info, network_interfaces_count);
+    cJSON *interfaces = cJSON_CreateObject();
+
+    for (int i = 0; i < network_interfaces_count; i++)
+    {
+        cJSON *interface = cJSON_CreateObject();
+        cJSON_AddStringToObject(interface, "mac_address", interfaces_info[i].mac);
+
+        cJSON_AddStringToObject(interface, "ip", interfaces_info[i].ip);
+        cJSON_AddStringToObject(interface, "netmask", interfaces_info[i].netmask);
+        cJSON_AddStringToObject(interface, "gw", interfaces_info[i].gw);
+
+        // cJSON_AddStringToObject(interface, "desc", interfaces_info[i].desc);
+        // cJSON_AddBoolToObject(interface, "is_up", interfaces_info[i].is_up);
+
+        cJSON_AddItemToObject(interfaces, interfaces_info[i].desc, interface);
+    }
+    cJSON_AddItemToObject(root, "interfaces_info", interfaces);
+
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+    cJSON *chip = cJSON_CreateObject();
+    cJSON_AddNumberToObject(chip, "chip_model", (int)chip_info.model);
+    cJSON_AddNumberToObject(chip, "features", chip_info.features);
+    cJSON_AddNumberToObject(chip, "cores", chip_info.cores);
+    cJSON_AddNumberToObject(chip, "revision", chip_info.revision);
+
+    cJSON_AddItemToObject(root, "chip", chip);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *)sys_info);
@@ -88,12 +127,12 @@ esp_err_t start_rest_server(const char *base_path)
     httpd_register_uri_handler(server, &temperature_data_get_uri);
 
     /* URI handler for fetching uptime data */
-    httpd_uri_t uptime_data_get_uri = {
-        .uri = "/api/v1/uptime",
+    httpd_uri_t device_data_get_uri = {
+        .uri = "/api/v1/device",
         .method = HTTP_GET,
-        .handler = uptime_data_get_handler,
+        .handler = device_data_get_handler,
         .user_ctx = rest_context};
-    httpd_register_uri_handler(server, &uptime_data_get_uri);
+    httpd_register_uri_handler(server, &device_data_get_uri);
 
     return ESP_OK;
 err_start:

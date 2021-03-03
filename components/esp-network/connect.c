@@ -27,7 +27,7 @@
 
 #ifdef CONFIG_CONNECT_IPV6
 #define MAX_IP6_ADDRS_PER_NETIF (5)
-#define NR_OF_IP_ADDRESSES_TO_WAIT_FOR (s_active_interfaces*2)
+#define NR_OF_IP_ADDRESSES_TO_WAIT_FOR (s_active_interfaces * 2)
 
 #if defined(CONFIG_CONNECT_IPV6_PREF_LOCAL_LINK)
 #define CONNECT_PREFERRED_IPV6_TYPE ESP_IP6_ADDR_IS_LINK_LOCAL
@@ -58,18 +58,17 @@ static const char *s_ipv6_addr_types[] = {
     "ESP_IP6_ADDR_IS_LINK_LOCAL",
     "ESP_IP6_ADDR_IS_SITE_LOCAL",
     "ESP_IP6_ADDR_IS_UNIQUE_LOCAL",
-    "ESP_IP6_ADDR_IS_IPV4_MAPPED_IPV6"
-    };
+    "ESP_IP6_ADDR_IS_IPV4_MAPPED_IPV6"};
 #endif
 
 static const char *TAG = "network_connect";
 
 #if CONFIG_CONNECT_WIFI
-static esp_netif_t* wifi_start(void);
+static esp_netif_t *wifi_start(void);
 static void wifi_stop(void);
 #endif
 #if CONFIG_CONNECT_ETHERNET
-static esp_netif_t* eth_start(void);
+static esp_netif_t *eth_start(void);
 static void eth_stop(void);
 #endif
 
@@ -80,7 +79,7 @@ static void eth_stop(void);
  */
 static bool is_our_netif(const char *prefix, esp_netif_t *netif)
 {
-    return strncmp(prefix, esp_netif_get_desc(netif), strlen(prefix)-1) == 0;
+    return strncmp(prefix, esp_netif_get_desc(netif), strlen(prefix) - 1) == 0;
 }
 
 /* set up connection, Wi-Fi and/or Ethernet */
@@ -123,7 +122,8 @@ static void on_got_ip(void *arg, esp_event_base_t event_base,
                       int32_t event_id, void *event_data)
 {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-    if (!is_our_netif(TAG, event->esp_netif)) {
+    if (!is_our_netif(TAG, event->esp_netif))
+    {
         ESP_LOGW(TAG, "Got IPv4 from another interface \"%s\": ignored", esp_netif_get_desc(event->esp_netif));
         return;
     }
@@ -138,14 +138,16 @@ static void on_got_ipv6(void *arg, esp_event_base_t event_base,
                         int32_t event_id, void *event_data)
 {
     ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
-    if (!is_our_netif(TAG, event->esp_netif)) {
+    if (!is_our_netif(TAG, event->esp_netif))
+    {
         ESP_LOGW(TAG, "Got IPv6 from another netif: ignored");
         return;
     }
     esp_ip6_addr_type_t ipv6_type = esp_netif_ip6_get_addr_type(&event->ip6_info.ip);
     ESP_LOGI(TAG, "Got IPv6 event: Interface \"%s\" address: " IPV6STR ", type: %s", esp_netif_get_desc(event->esp_netif),
-            IPV62STR(event->ip6_info.ip), s_ipv6_addr_types[ipv6_type]);
-    if (ipv6_type == CONNECT_PREFERRED_IPV6_TYPE) {
+             IPV62STR(event->ip6_info.ip), s_ipv6_addr_types[ipv6_type]);
+    if (ipv6_type == CONNECT_PREFERRED_IPV6_TYPE)
+    {
         memcpy(&s_ipv6_addr, &event->ip6_info.ip, sizeof(s_ipv6_addr));
         xSemaphoreGive(s_semph_get_ip_addrs);
     }
@@ -155,21 +157,25 @@ static void on_got_ipv6(void *arg, esp_event_base_t event_base,
 
 esp_err_t network_connect(void)
 {
-    if (s_semph_get_ip_addrs != NULL) {
+    if (s_semph_get_ip_addrs != NULL)
+    {
         return ESP_ERR_INVALID_STATE;
     }
     start();
     ESP_ERROR_CHECK(esp_register_shutdown_handler(&stop));
     ESP_LOGI(TAG, "Waiting for IP(s)");
-    for (int i=0; i<NR_OF_IP_ADDRESSES_TO_WAIT_FOR; ++i) {
+    for (int i = 0; i < NR_OF_IP_ADDRESSES_TO_WAIT_FOR; ++i)
+    {
         xSemaphoreTake(s_semph_get_ip_addrs, portMAX_DELAY);
     }
     // iterate over active interfaces, and print out IPs of "our" netifs
     esp_netif_t *netif = NULL;
     esp_netif_ip_info_t ip;
-    for (int i=0; i<esp_netif_get_nr_of_ifs(); ++i) {
+    for (int i = 0; i < esp_netif_get_nr_of_ifs(); ++i)
+    {
         netif = esp_netif_next(netif);
-        if (is_our_netif(TAG, netif)) {
+        if (is_our_netif(TAG, netif))
+        {
             ESP_LOGI(TAG, "Connected to %s", esp_netif_get_desc(netif));
             ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
 
@@ -177,12 +183,12 @@ esp_err_t network_connect(void)
 #ifdef CONFIG_CONNECT_IPV6
             esp_ip6_addr_t ip6[MAX_IP6_ADDRS_PER_NETIF];
             int ip6_addrs = esp_netif_get_all_ip6(netif, ip6);
-            for (int j=0; j< ip6_addrs; ++j) {
+            for (int j = 0; j < ip6_addrs; ++j)
+            {
                 esp_ip6_addr_type_t ipv6_type = esp_netif_ip6_get_addr_type(&(ip6[j]));
                 ESP_LOGI(TAG, "- IPv6 address: " IPV6STR ", type: %s", IPV62STR(ip6[j]), s_ipv6_addr_types[ipv6_type]);
             }
 #endif
-
         }
     }
     return ESP_OK;
@@ -190,7 +196,8 @@ esp_err_t network_connect(void)
 
 esp_err_t network_disconnect(void)
 {
-    if (s_semph_get_ip_addrs == NULL) {
+    if (s_semph_get_ip_addrs == NULL)
+    {
         return ESP_ERR_INVALID_STATE;
     }
     vSemaphoreDelete(s_semph_get_ip_addrs);
@@ -206,7 +213,8 @@ static void on_wifi_disconnect(void *arg, esp_event_base_t event_base,
 {
     ESP_LOGI(TAG, "Wi-Fi disconnected, trying to reconnect...");
     esp_err_t err = esp_wifi_connect();
-    if (err == ESP_ERR_WIFI_NOT_STARTED) {
+    if (err == ESP_ERR_WIFI_NOT_STARTED)
+    {
         return;
     }
     ESP_ERROR_CHECK(err);
@@ -222,7 +230,7 @@ static void on_wifi_connect(void *esp_netif, esp_event_base_t event_base,
 
 #endif // CONFIG_CONNECT_IPV6
 
-static esp_netif_t* wifi_start(void)
+static esp_netif_t *wifi_start(void)
 {
     char *desc;
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -270,7 +278,8 @@ static void wifi_stop(void)
     ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &on_wifi_connect));
 #endif
     esp_err_t err = esp_wifi_stop();
-    if (err == ESP_ERR_WIFI_NOT_INIT) {
+    if (err == ESP_ERR_WIFI_NOT_INIT)
+    {
         return;
     }
     ESP_ERROR_CHECK(err);
@@ -289,7 +298,8 @@ static void wifi_stop(void)
 static void on_eth_event(void *esp_netif, esp_event_base_t event_base,
                          int32_t event_id, void *event_data)
 {
-    switch (event_id) {
+    switch (event_id)
+    {
     case ETHERNET_EVENT_CONNECTED:
         ESP_LOGI(TAG, "Ethernet Link Up");
         esp_netif_create_ip6_linklocal(esp_netif);
@@ -306,7 +316,7 @@ static esp_eth_mac_t *s_mac = NULL;
 static esp_eth_phy_t *s_phy = NULL;
 static void *s_eth_glue = NULL;
 
-static esp_netif_t* eth_start(void)
+static esp_netif_t *eth_start(void)
 {
     char *desc;
     esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_ETH();
@@ -316,9 +326,8 @@ static esp_netif_t* eth_start(void)
     esp_netif_config.if_desc = desc;
     esp_netif_config.route_prio = 64;
     esp_netif_config_t netif_config = {
-            .base = &esp_netif_config,
-            .stack = ESP_NETIF_NETSTACK_DEFAULT_ETH
-    };
+        .base = &esp_netif_config,
+        .stack = ESP_NETIF_NETSTACK_DEFAULT_ETH};
     esp_netif_t *netif = esp_netif_new(&netif_config);
     assert(netif);
     free(desc);
@@ -364,8 +373,7 @@ static esp_netif_t* eth_start(void)
         .mode = 0,
         .clock_speed_hz = CONFIG_DM9051_SPI_CLOCK_MHZ * 1000 * 1000,
         .spics_io_num = CONFIG_DM9051_CS_GPIO,
-        .queue_size = 20
-    };
+        .queue_size = 20};
     ESP_ERROR_CHECK(spi_bus_add_device(CONFIG_DM9051_SPI_HOST, &devcfg, &spi_handle));
     /* dm9051 ethernet driver is based on spi driver */
     eth_dm9051_config_t dm9051_config = ETH_DM9051_DEFAULT_CONFIG(spi_handle);
@@ -419,12 +427,126 @@ esp_netif_t *network_get_netif_from_desc(const char *desc)
     esp_netif_t *netif = NULL;
     char *expected_desc;
     asprintf(&expected_desc, "%s: %s", TAG, desc);
-    while ((netif = esp_netif_next(netif)) != NULL) {
-        if (strcmp(esp_netif_get_desc(netif), expected_desc) == 0) {
+    while ((netif = esp_netif_next(netif)) != NULL)
+    {
+        if (strcmp(esp_netif_get_desc(netif), expected_desc) == 0)
+        {
             free(expected_desc);
             return netif;
         }
     }
     free(expected_desc);
     return netif;
+}
+
+typedef union
+{
+    esp_ip4_addr_t ip4_addr;
+    uint32_t ip;
+} ip4_union_t;
+
+esp_err_t create_mac_string(char *dest, size_t dest_len, const uint8_t *values, size_t val_len)
+{
+    if (dest_len < (val_len * 2 + 1)) /* check that dest is large enough */
+        return ESP_ERR_INVALID_ARG;
+    *dest = '\0'; /* in case val_len==0 */
+    while (val_len--)
+    {
+        /* sprintf directly to where dest points */
+        sprintf(dest, "%02X", *values);
+        dest += 2;
+        ++values;
+        if (val_len) /* if its not the last byte, then add : separator */
+        {
+            sprintf(dest, "%c", ':');
+            dest++;
+        }
+    }
+    return ESP_OK;
+}
+esp_err_t create_ip_string(char *dest, size_t dest_len, esp_ip4_addr_t ip4_address)
+{
+    int buff_len = 16;
+    char buff[buff_len];
+    if (buff_len > dest_len)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+    ip4_union_t addr = {.ip4_addr = ip4_address};
+    uint32_t ip = addr.ip;
+    unsigned char bytes[4];
+    bytes[0] = ip & 0xFF;
+    bytes[1] = (ip >> 8) & 0xFF;
+    bytes[2] = (ip >> 16) & 0xFF;
+    bytes[3] = (ip >> 24) & 0xFF;
+    snprintf(buff, buff_len, "%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3]);
+    strncpy(dest, (char *)buff, buff_len);
+    return ESP_OK;
+}
+
+esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
+{
+    esp_netif_t *netif = NULL;
+    esp_netif_ip_info_t ip;
+    int dest_index = 0;
+    if (esp_netif_get_nr_of_ifs() > dest_len)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+    printf("number of netifs: %i", esp_netif_get_nr_of_ifs());
+    for (int i = 0; i < esp_netif_get_nr_of_ifs(); ++i)
+    {
+        netif = esp_netif_next(netif);
+        if (is_our_netif(TAG, netif))
+        {
+            //     // printf("ip address already in struct %s", dest[dest_index]->ip);
+            uint8_t mac[6];
+            ESP_LOGI("esp_netif_get", "get mac result %i", esp_netif_get_mac(netif, mac));
+            int buffer_length = member_size(esp_network_info_t, mac) / sizeof(char); // cast nullpointer to struct and get member size
+            char buf[buffer_length];
+            ESP_LOGI("esp_netif_get", "create mac string result %i", create_mac_string(buf, sizeof(buf), mac, sizeof(mac)));
+            strncpy(dest[dest_index].mac, buf, buffer_length);
+            // char **hostname = NULL;
+            // ESP_ERROR_CHECK(esp_netif_get_hostname(netif, hostname));
+            // dest[dest_index]->hostname = *hostname;
+
+            ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
+            int buff_len = 16;
+            char buff[buff_len];
+
+            ESP_ERROR_CHECK(create_ip_string(buff, buff_len, ip.ip));
+            strncpy(dest[dest_index].ip, buff, buff_len);
+            ESP_ERROR_CHECK(create_ip_string(buff, buff_len, ip.netmask));
+            strncpy(dest[dest_index].netmask, buff, buff_len);
+            ESP_ERROR_CHECK(create_ip_string(buff, buff_len, ip.gw));
+            strncpy(dest[dest_index].gw, buff, buff_len);
+
+            // const char *netif_desc = esp_netif_get_desc(netif);
+            // int desc_offset = strlen(TAG) + 2; // acount for colon and space
+            // int desc_size = member_size(esp_network_info_t, desc);
+            // printf("desc_size %i", desc_size);
+            // memcpy(dest[dest_index].desc, &netif_desc[desc_offset], desc_size);
+            // dest[dest_index].desc[desc_size - 1] = '\0';
+            // dest[dest_index].desc = strndup(netif_desc, sizeof(netif_desc) / sizeof(char));
+
+            dest[dest_index]
+                .is_up = esp_netif_is_netif_up(netif);
+
+            // if (strcmp(netif_desc, "sta")) // if the interface is wifi client
+            // {
+            //     wifi_ap_record_t *apinfo;
+            //     // add the wifi_ap_record
+            //     ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(apinfo));
+            //     dest[dest_index]->wifi_info = apinfo;
+            //     free(apinfo); // nooo
+            // }
+            // else
+            // {
+            // dest->wifi_info = NULL;
+            // }
+            dest_index++;
+        }
+    }
+    free(netif);
+    return ESP_OK;
 }
