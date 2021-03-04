@@ -500,15 +500,15 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
         if (is_our_netif(TAG, netif))
         {
             uint8_t mac[6];
-            ESP_LOGI("esp_netif_get", "get mac result %i", esp_netif_get_mac(netif, mac));
+            esp_netif_get_mac(netif, mac);
             int buffer_length = member_size(esp_network_info_t, mac) / sizeof(char);
             char buf[buffer_length];
-            ESP_LOGI("esp_netif_get", "create mac string result %i", create_mac_string(buf, sizeof(buf), mac, sizeof(mac)));
+            create_mac_string(buf, sizeof(buf), mac, sizeof(mac));
             strncpy(dest[dest_index].mac, buf, buffer_length);
 
-            const char **hostname = NULL;
-            esp_netif_get_hostname(netif, hostname);
-            dest[dest_index]->hostname = *hostname;
+            // const char **hostname = NULL;
+            // esp_netif_get_hostname(netif, hostname);
+            // dest[dest_index].hostname = *hostname;
 
             ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
             int buff_len = 16;
@@ -521,32 +521,31 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
             ESP_ERROR_CHECK(create_ip_string(buff, buff_len, ip.gw));
             strncpy(dest[dest_index].gw, buff, buff_len);
 
-            // const char *netif_desc = esp_netif_get_desc(netif);
-            // int desc_offset = strlen(TAG) + 2; // acount for colon and space
-            // int desc_size = member_size(esp_network_info_t, desc);
-            // printf("desc_size %i", desc_size);
-            // memcpy(dest[dest_index].desc, &netif_desc[desc_offset], desc_size);
-            // dest[dest_index].desc[desc_size - 1] = '\0';
-            // dest[dest_index].desc = strndup(netif_desc, sizeof(netif_desc) / sizeof(char));
+            const char *netif_desc = esp_netif_get_desc(netif);
+            int desc_offset = strlen(TAG) + 2; // acount for colon and space
+            int desc_size = member_size(esp_network_info_t, desc);
+            printf("desc_size %i", desc_size);
+            memcpy(dest[dest_index].desc, &netif_desc[desc_offset], desc_size);
+            dest[dest_index].desc[desc_size - 1] = '\0';
 
             dest[dest_index]
                 .is_up = esp_netif_is_netif_up(netif);
 
-            // if (strcmp(netif_desc, "sta")) // if the interface is wifi client
-            // {
-            //     wifi_ap_record_t *apinfo = malloc(sizeof(wifi_ap_record_t));
-            //     // add the wifi_ap_record
-            //     ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(apinfo));
-            //     dest[dest_index]->wifi_info = apinfo; // pointer assignment, should be freed only in free_esp_network_info
-            // }
-            // else
-            // {
-            // dest->wifi_info = NULL;
-            // }
+            if (strcmp(netif_desc, "sta")) // if the interface is wifi client
+            {
+                wifi_ap_record_t *apinfo = malloc(sizeof(wifi_ap_record_t));
+                // add the wifi_ap_record
+                ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(apinfo));
+                dest[dest_index].wifi_info = apinfo; // pointer assignment, should be freed only in free_esp_network_info
+            }
+            else
+            {
+                dest->wifi_info = NULL;
+            }
             dest_index++;
         }
     }
-    free(netif);
+    // freeing netif pointer will delete actual interface it is pointing to
     return ESP_OK;
 }
 

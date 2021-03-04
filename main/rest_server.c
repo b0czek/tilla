@@ -69,11 +69,12 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     network_interfaces_count++;
 #endif
     esp_network_info_t *interfaces_info = malloc(network_interfaces_count * sizeof(esp_network_info_t));
-    // get_esp_network_info(interfaces_info, network_interfaces_count);
+    get_esp_network_info(interfaces_info, network_interfaces_count);
     cJSON *interfaces = cJSON_CreateObject();
 
     for (int i = 0; i < network_interfaces_count; i++)
     {
+        // esp_network_info_t *netif = interfaces_info + i * sizeof(esp_network_info_t);
         cJSON *interface = cJSON_CreateObject();
         cJSON_AddStringToObject(interface, "mac_address", interfaces_info[i].mac);
 
@@ -83,7 +84,15 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
 
         // cJSON_AddStringToObject(interface, "desc", interfaces_info[i].desc);
         cJSON_AddBoolToObject(interface, "is_up", interfaces_info[i].is_up);
-
+        if (strcmp(interfaces_info[i].desc, "sta") == 0)
+        {
+            cJSON *wifi_info = cJSON_CreateObject();
+            cJSON_AddStringToObject(wifi_info, "ssid", (char *)interfaces_info[i].wifi_info->ssid);
+            cJSON_AddNumberToObject(wifi_info, "rssi", interfaces_info[i].wifi_info->rssi);
+            cJSON_AddNumberToObject(wifi_info, "auth_mode", (int)interfaces_info[i].wifi_info->authmode);
+            cJSON_AddStringToObject(wifi_info, "country_code", interfaces_info[i].wifi_info->country.cc);
+            cJSON_AddItemToObject(interface, "wifi_info", wifi_info);
+        }
         cJSON_AddItemToObject(interfaces, interfaces_info[i].desc, interface);
     }
     cJSON_AddItemToObject(root, "interfaces_info", interfaces);
@@ -97,12 +106,16 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(chip, "revision", chip_info.revision);
 
     cJSON_AddItemToObject(root, "chip", chip);
+
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
 
     free((void *)sys_info);
-
     cJSON_Delete(root);
+    // for (int i = 0; i < network_interfaces_count; i++)
+    // {
+    //     free_esp_network_info(interfaces_info + i * sizeof(interfaces_info));
+    // }
     return ESP_OK;
 }
 
