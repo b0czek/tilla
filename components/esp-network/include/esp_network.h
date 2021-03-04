@@ -73,7 +73,7 @@ esp_netif_t *network_get_netif(void);
  */
 esp_netif_t *network_get_netif_from_desc(const char *desc);
 
-#define member_size(type, member) sizeof(((type *)0)->member)
+#define member_size(type, member) sizeof(((type *)0)->member) // cast nullpointer to struct and get member size
 
 typedef struct 
 {
@@ -90,6 +90,12 @@ typedef struct
 
 
 esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len);
+
+/**
+ * @brief function used for deallocating memory from network_info structs
+ * @param network_info pointer to struct
+ */
+void free_esp_network_info(esp_network_info_t *network_info);
 
 #ifdef __cplusplus
 }

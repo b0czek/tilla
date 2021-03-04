@@ -499,16 +499,16 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
         netif = esp_netif_next(netif);
         if (is_our_netif(TAG, netif))
         {
-            //     // printf("ip address already in struct %s", dest[dest_index]->ip);
             uint8_t mac[6];
             ESP_LOGI("esp_netif_get", "get mac result %i", esp_netif_get_mac(netif, mac));
-            int buffer_length = member_size(esp_network_info_t, mac) / sizeof(char); // cast nullpointer to struct and get member size
+            int buffer_length = member_size(esp_network_info_t, mac) / sizeof(char);
             char buf[buffer_length];
             ESP_LOGI("esp_netif_get", "create mac string result %i", create_mac_string(buf, sizeof(buf), mac, sizeof(mac)));
             strncpy(dest[dest_index].mac, buf, buffer_length);
-            // char **hostname = NULL;
-            // ESP_ERROR_CHECK(esp_netif_get_hostname(netif, hostname));
-            // dest[dest_index]->hostname = *hostname;
+
+            const char **hostname = NULL;
+            esp_netif_get_hostname(netif, hostname);
+            dest[dest_index]->hostname = *hostname;
 
             ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
             int buff_len = 16;
@@ -534,11 +534,10 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
 
             // if (strcmp(netif_desc, "sta")) // if the interface is wifi client
             // {
-            //     wifi_ap_record_t *apinfo;
+            //     wifi_ap_record_t *apinfo = malloc(sizeof(wifi_ap_record_t));
             //     // add the wifi_ap_record
             //     ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(apinfo));
-            //     dest[dest_index]->wifi_info = apinfo;
-            //     free(apinfo); // nooo
+            //     dest[dest_index]->wifi_info = apinfo; // pointer assignment, should be freed only in free_esp_network_info
             // }
             // else
             // {
@@ -549,4 +548,12 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
     }
     free(netif);
     return ESP_OK;
+}
+
+void free_esp_network_info(esp_network_info_t *network_info)
+{
+    free(network_info->hostname);
+    free(network_info->wifi_info);
+    free(network_info);
+    network_info = NULL;
 }

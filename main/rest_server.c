@@ -82,7 +82,7 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
         cJSON_AddStringToObject(interface, "gw", interfaces_info[i].gw);
 
         // cJSON_AddStringToObject(interface, "desc", interfaces_info[i].desc);
-        // cJSON_AddBoolToObject(interface, "is_up", interfaces_info[i].is_up);
+        cJSON_AddBoolToObject(interface, "is_up", interfaces_info[i].is_up);
 
         cJSON_AddItemToObject(interfaces, interfaces_info[i].desc, interface);
     }
@@ -99,7 +99,9 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     cJSON_AddItemToObject(root, "chip", chip);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
+
     free((void *)sys_info);
+
     cJSON_Delete(root);
     return ESP_OK;
 }
