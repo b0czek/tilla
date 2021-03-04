@@ -74,26 +74,25 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
 
     for (int i = 0; i < network_interfaces_count; i++)
     {
-        // esp_network_info_t *netif = interfaces_info + i * sizeof(esp_network_info_t);
+        esp_network_info_t *netif = interfaces_info + i;
         cJSON *interface = cJSON_CreateObject();
-        cJSON_AddStringToObject(interface, "mac_address", interfaces_info[i].mac);
+        cJSON_AddStringToObject(interface, "mac_address", netif->mac);
 
-        cJSON_AddStringToObject(interface, "ip", interfaces_info[i].ip);
-        cJSON_AddStringToObject(interface, "netmask", interfaces_info[i].netmask);
-        cJSON_AddStringToObject(interface, "gw", interfaces_info[i].gw);
+        cJSON_AddStringToObject(interface, "ip", netif->ip);
+        cJSON_AddStringToObject(interface, "netmask", netif->netmask);
+        cJSON_AddStringToObject(interface, "gw", netif->gw);
 
-        // cJSON_AddStringToObject(interface, "desc", interfaces_info[i].desc);
-        cJSON_AddBoolToObject(interface, "is_up", interfaces_info[i].is_up);
-        if (strcmp(interfaces_info[i].desc, "sta") == 0)
+        cJSON_AddBoolToObject(interface, "is_up", netif->is_up);
+        if (strcmp(netif->desc, "sta") == 0)
         {
             cJSON *wifi_info = cJSON_CreateObject();
-            cJSON_AddStringToObject(wifi_info, "ssid", (char *)interfaces_info[i].wifi_info->ssid);
-            cJSON_AddNumberToObject(wifi_info, "rssi", interfaces_info[i].wifi_info->rssi);
-            cJSON_AddNumberToObject(wifi_info, "auth_mode", (int)interfaces_info[i].wifi_info->authmode);
-            cJSON_AddStringToObject(wifi_info, "country_code", interfaces_info[i].wifi_info->country.cc);
+            cJSON_AddStringToObject(wifi_info, "ssid", (char *)netif->wifi_info->ssid);
+            cJSON_AddNumberToObject(wifi_info, "rssi", netif->wifi_info->rssi);
+            cJSON_AddNumberToObject(wifi_info, "auth_mode", (int)netif->wifi_info->authmode);
+            cJSON_AddStringToObject(wifi_info, "country_code", netif->wifi_info->country.cc);
             cJSON_AddItemToObject(interface, "wifi_info", wifi_info);
         }
-        cJSON_AddItemToObject(interfaces, interfaces_info[i].desc, interface);
+        cJSON_AddItemToObject(interfaces, netif->desc, interface);
     }
     cJSON_AddItemToObject(root, "interfaces_info", interfaces);
 
@@ -114,7 +113,7 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     cJSON_Delete(root);
     // for (int i = 0; i < network_interfaces_count; i++)
     // {
-    //     free_esp_network_info(interfaces_info + i * sizeof(interfaces_info));
+    //     free_esp_network_info(interfaces_info);
     // }
     return ESP_OK;
 }
