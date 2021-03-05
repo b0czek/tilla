@@ -78,7 +78,7 @@ esp_netif_t *network_get_netif_from_desc(const char *desc);
 typedef struct 
 {
     char mac[6*2+6]; // 6 bytes, 2 chars per byte, colons between them(5) and \0 at the end
-    char *hostname;
+    char *hostname[33]; // max hostname length is 32 characters
     char ip[16];
     char netmask[16];
     char gw[16];
