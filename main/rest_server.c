@@ -38,8 +38,31 @@ typedef struct rest_server_context
 float get_readings();
 bool get_error_state();
 
+cJSON *get_chip_info()
+{
+    cJSON *chip = cJSON_CreateObject();
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+    cJSON_AddNumberToObject(chip, "chip_model", (int)chip_info.model);
+    cJSON_AddNumberToObject(chip, "features", chip_info.features);
+    cJSON_AddNumberToObject(chip, "cores", chip_info.cores);
+    cJSON_AddNumberToObject(chip, "revision", chip_info.revision);
+
+    // add chip_id(factory programmed mac address)
+    uint8_t mac[MAC_BYTES];
+    esp_efuse_mac_get_default(mac);
+    int id_len = 18;
+    char id[id_len];
+    create_mac_string(id, id_len, mac, MAC_BYTES);
+    cJSON_AddStringToObject(chip, "chip_id", id);
+
+    return chip;
+}
+cJSON *chip_info = NULL;
+
 /* Simple handler for getting temperature data */
-static esp_err_t temperature_data_get_handler(httpd_req_t *req)
+static esp_err_t
+temperature_data_get_handler(httpd_req_t *req)
 {
 
     httpd_resp_set_type(req, "application/json");
@@ -100,23 +123,7 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     }
     cJSON_AddItemToObject(root, "interfaces_info", interfaces);
 
-    esp_chip_info_t chip_info;
-    esp_chip_info(&chip_info);
-    cJSON *chip = cJSON_CreateObject();
-    cJSON_AddNumberToObject(chip, "chip_model", (int)chip_info.model);
-    cJSON_AddNumberToObject(chip, "features", chip_info.features);
-    cJSON_AddNumberToObject(chip, "cores", chip_info.cores);
-    cJSON_AddNumberToObject(chip, "revision", chip_info.revision);
-
-    // add chip_id(factory programmed mac address)
-    uint8_t mac[MAC_BYTES];
-    esp_efuse_mac_get_default(mac);
-    int id_len = 18;
-    char id[id_len];
-    create_mac_string(id, id_len, mac, MAC_BYTES);
-    cJSON_AddStringToObject(chip, "chip_id", id);
-
-    cJSON_AddItemToObject(root, "chip", chip);
+    cJSON_AddItemReferenceToObject(root, "chip_info", chip_info);
 
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
@@ -148,6 +155,9 @@ esp_err_t start_rest_server(const char *base_path)
         .handler = temperature_data_get_handler,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &temperature_data_get_uri);
+
+    // prefetch chip info data as it's constant
+    chip_info = get_chip_info();
 
     /* URI handler for fetching uptime data */
     httpd_uri_t device_data_get_uri = {
