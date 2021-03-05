@@ -484,12 +484,25 @@ esp_err_t create_ip_string(char *dest, size_t dest_len, esp_ip4_addr_t ip4_addre
     return ESP_OK;
 }
 
+esp_err_t create_ipv4_dns_string(char *dest, size_t dest_len, esp_netif_dns_info_t dns)
+{
+    if (dns.ip.type == 0) // if ip is ipv4, then proceed
+    {
+        return create_ip_string(dest, dest_len, dns.ip.u_addr.ip4);
+    }
+    else // if its ipv6, then set string to empty and return
+    {
+        dest[0] = '\0';
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+    return ESP_OK;
+}
+
 esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
 {
     esp_netif_t *netif = NULL;
     esp_netif_ip_info_t ip;
     esp_netif_dns_info_t dns;
-    int dest_index = 0;
     if (esp_netif_get_nr_of_ifs() > dest_len)
     {
         return ESP_ERR_INVALID_ARG;
@@ -505,12 +518,12 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
             int buffer_length = member_size(esp_network_info_t, mac) / sizeof(char);
             char buf[buffer_length];
             // formatting it into string and copying to
-            create_mac_string(buf, sizeof(buf), mac, sizeof(mac));
+            create_mac_string(buf, buffer_length, mac, MAC_BYTES);
             strncpy(dest->mac, buf, buffer_length);
 
-            const char **hostname = NULL;
-            esp_netif_get_hostname(netif, hostname);
-            strcpy(dest->hostname, *hostname);
+            const char *hostname = NULL;
+            esp_netif_get_hostname(netif, &hostname);
+            strcpy(dest->hostname, hostname);
 
             // fetching ip data
             ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
@@ -526,12 +539,10 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
 
             //dns data
             esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
-            create_ip_string(buff, buff_len, dns.ip);
-            strncpy(dest->dns_primary, buff, buff_len);
-            // secondary
+            create_ipv4_dns_string(dest->dns_primary, buff_len, dns);
+            // // secondary
             esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
-            create_ip_string(buff, buff_len, dns.ip);
-            strncpy(dest->dns_secondary, buff, buff_len);
+            create_ipv4_dns_string(dest->dns_secondary, buff_len, dns);
 
             // getting description for interface, the string return from function will
             // look like network_connect: ... but you only want ...
@@ -562,9 +573,12 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
     return ESP_OK;
 }
 
-void free_esp_network_info(esp_network_info_t *network_info)
+void free_esp_network_info(esp_network_info_t *network_info, int count)
 {
-    free(network_info->wifi_info);
+    for (int i = 0; i < count; i++)
+    {
+        free((network_info + i)->wifi_info);
+    }
     free(network_info);
     network_info = NULL;
 }

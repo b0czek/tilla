@@ -74,11 +74,11 @@ esp_netif_t *network_get_netif(void);
 esp_netif_t *network_get_netif_from_desc(const char *desc);
 
 #define member_size(type, member) sizeof(((type *)0)->member) // cast nullpointer to struct and get member size
-
+#define MAC_BYTES 6
 typedef struct 
 {
     char mac[6*2+6]; // 6 bytes, 2 chars per byte, colons between them(5) and \0 at the end
-    char *hostname[33]; // max hostname length is 32 characters
+    char hostname[33]; // max hostname length is 32 characters
     char ip[16];
     char netmask[16];
     char gw[16];
@@ -90,6 +90,7 @@ typedef struct
     wifi_ap_record_t *wifi_info;
 } esp_network_info_t;
 
+esp_err_t create_mac_string(char *dest, size_t dest_len, const uint8_t *values, size_t val_len);
 
 esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len);
 
@@ -97,7 +98,7 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len);
  * @brief function used for deallocating memory from network_info structs
  * @param network_info pointer to struct
  */
-void free_esp_network_info(esp_network_info_t *network_info);
+void free_esp_network_info(esp_network_info_t *network_info, int count);
 
 #ifdef __cplusplus
 }

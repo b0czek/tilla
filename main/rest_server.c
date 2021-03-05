@@ -84,6 +84,8 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
         cJSON_AddStringToObject(interface, "primary_dns", netif->dns_primary);
         cJSON_AddStringToObject(interface, "secondary_dns", netif->dns_secondary);
 
+        cJSON_AddStringToObject(interface, "hostname", netif->hostname);
+
         cJSON_AddBoolToObject(interface, "is_up", netif->is_up);
         if (strcmp(netif->desc, "sta") == 0)
         {
@@ -106,6 +108,14 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     cJSON_AddNumberToObject(chip, "cores", chip_info.cores);
     cJSON_AddNumberToObject(chip, "revision", chip_info.revision);
 
+    // add chip_id(factory programmed mac address)
+    uint8_t mac[MAC_BYTES];
+    esp_efuse_mac_get_default(mac);
+    int id_len = 18;
+    char id[id_len];
+    create_mac_string(id, id_len, mac, MAC_BYTES);
+    cJSON_AddStringToObject(chip, "chip_id", id);
+
     cJSON_AddItemToObject(root, "chip", chip);
 
     const char *sys_info = cJSON_Print(root);
@@ -113,10 +123,7 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
 
     free((void *)sys_info);
     cJSON_Delete(root);
-    // for (int i = 0; i < network_interfaces_count; i++)
-    // {
-    //     free_esp_network_info(interfaces_info);
-    // }
+    free_esp_network_info(interfaces_info, network_interfaces_count);
     return ESP_OK;
 }
 
