@@ -488,12 +488,12 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
 {
     esp_netif_t *netif = NULL;
     esp_netif_ip_info_t ip;
+    esp_netif_dns_info_t dns;
     int dest_index = 0;
     if (esp_netif_get_nr_of_ifs() > dest_len)
     {
         return ESP_ERR_INVALID_ARG;
     }
-    printf("number of netifs: %i", esp_netif_get_nr_of_ifs());
     for (int i = 0; i < esp_netif_get_nr_of_ifs(); ++i)
     {
         netif = esp_netif_next(netif);
@@ -523,6 +523,15 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
             strncpy(dest->netmask, buff, buff_len);
             ESP_ERROR_CHECK(create_ip_string(buff, buff_len, ip.gw));
             strncpy(dest->gw, buff, buff_len);
+
+            //dns data
+            esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
+            create_ip_string(buff, buff_len, dns.ip);
+            strncpy(dest->dns_primary, buff, buff_len);
+            // secondary
+            esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
+            create_ip_string(buff, buff_len, dns.ip);
+            strncpy(dest->dns_secondary, buff, buff_len);
 
             // getting description for interface, the string return from function will
             // look like network_connect: ... but you only want ...

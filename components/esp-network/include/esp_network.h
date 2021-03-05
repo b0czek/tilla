@@ -82,6 +82,8 @@ typedef struct
     char ip[16];
     char netmask[16];
     char gw[16];
+    char dns_primary[16];
+    char dns_secondary[16];
     char desc[4];
     bool is_up;
 

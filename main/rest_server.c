@@ -81,6 +81,8 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
         cJSON_AddStringToObject(interface, "ip", netif->ip);
         cJSON_AddStringToObject(interface, "netmask", netif->netmask);
         cJSON_AddStringToObject(interface, "gw", netif->gw);
+        cJSON_AddStringToObject(interface, "primary_dns", netif->dns_primary);
+        cJSON_AddStringToObject(interface, "secondary_dns", netif->dns_secondary);
 
         cJSON_AddBoolToObject(interface, "is_up", netif->is_up);
         if (strcmp(netif->desc, "sta") == 0)
