@@ -518,11 +518,8 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
         // fetching mac address
         uint8_t mac[6];
         esp_netif_get_mac(netif, mac);
-        int buffer_length = member_size(esp_network_info_t, mac) / sizeof(char);
-        char buf[buffer_length];
-        // formatting it into string and copying to
-        create_mac_string(buf, buffer_length, mac, MAC_BYTES);
-        strncpy(dest->mac, buf, buffer_length);
+        // formatting mac bytes into string
+        create_mac_string(dest->mac, MAC_STRING_LENGH, mac, MAC_BYTES);
 
         const char *hostname = NULL;
         esp_netif_get_hostname(netif, &hostname);

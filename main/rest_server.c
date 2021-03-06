@@ -52,7 +52,7 @@ cJSON *get_chip_info()
     // add chip_id(factory programmed mac address)
     uint8_t mac[MAC_BYTES];
     esp_efuse_mac_get_default(mac);
-    int id_len = 18;
+    int id_len = MAC_STRING_LENGH;
     char id[id_len];
     create_mac_string(id, id_len, mac, MAC_BYTES);
     cJSON_AddStringToObject(chip, "chip_id", id);
@@ -120,6 +120,11 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
             cJSON *wifi_info = cJSON_CreateObject(); // create json object
             if (netif->wifi_info)                    // if pointer is not null, then add info about connection
             {
+                int id_len = MAC_STRING_LENGH;
+                char id[id_len];
+                create_mac_string(id, id_len, netif->wifi_info->bssid, MAC_BYTES);
+                cJSON_AddStringToObject(wifi_info, "bssid", id);
+
                 cJSON_AddStringToObject(wifi_info, "ssid", (char *)netif->wifi_info->ssid);
                 cJSON_AddNumberToObject(wifi_info, "rssi", netif->wifi_info->rssi);
                 cJSON_AddNumberToObject(wifi_info, "auth_mode", (int)netif->wifi_info->authmode);
