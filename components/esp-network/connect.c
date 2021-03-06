@@ -466,7 +466,7 @@ esp_err_t create_mac_string(char *dest, size_t dest_len, const uint8_t *values, 
 }
 esp_err_t create_ip_string(char *dest, size_t dest_len, esp_ip4_addr_t ip4_address)
 {
-    int buff_len = 16;
+    int buff_len = IP_STRING_LENGTH;
     char buff[buff_len];
     if (buff_len > dest_len)
     {
@@ -510,64 +510,69 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
     for (int i = 0; i < esp_netif_get_nr_of_ifs(); ++i)
     {
         netif = esp_netif_next(netif);
-        if (is_our_netif(TAG, netif))
+        if (!is_our_netif(TAG, netif)) // skip if interface is not "our" somehow
         {
-            // fetching mac address
-            uint8_t mac[6];
-            esp_netif_get_mac(netif, mac);
-            int buffer_length = member_size(esp_network_info_t, mac) / sizeof(char);
-            char buf[buffer_length];
-            // formatting it into string and copying to
-            create_mac_string(buf, buffer_length, mac, MAC_BYTES);
-            strncpy(dest->mac, buf, buffer_length);
+            continue;
+        }
 
-            const char *hostname = NULL;
-            esp_netif_get_hostname(netif, &hostname);
-            strcpy(dest->hostname, hostname);
+        // fetching mac address
+        uint8_t mac[6];
+        esp_netif_get_mac(netif, mac);
+        int buffer_length = member_size(esp_network_info_t, mac) / sizeof(char);
+        char buf[buffer_length];
+        // formatting it into string and copying to
+        create_mac_string(buf, buffer_length, mac, MAC_BYTES);
+        strncpy(dest->mac, buf, buffer_length);
 
-            // fetching ip data
-            ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
-            int buff_len = 16;
-            char buff[buff_len];
+        const char *hostname = NULL;
+        esp_netif_get_hostname(netif, &hostname);
+        strcpy(dest->hostname, hostname);
 
-            ESP_ERROR_CHECK(create_ip_string(buff, buff_len, ip.ip));
-            strncpy(dest->ip, buff, buff_len);
-            ESP_ERROR_CHECK(create_ip_string(buff, buff_len, ip.netmask));
-            strncpy(dest->netmask, buff, buff_len);
-            ESP_ERROR_CHECK(create_ip_string(buff, buff_len, ip.gw));
-            strncpy(dest->gw, buff, buff_len);
+        // fetching ip data
+        ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
 
-            //dns data
-            esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
-            create_ipv4_dns_string(dest->dns_primary, buff_len, dns);
-            // // secondary
-            esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
-            create_ipv4_dns_string(dest->dns_secondary, buff_len, dns);
+        for (int i = 0; i < 3; i++) // iterate for ip,netmask,gw
+        {
+            char *ip_dest = (&dest->ip_info.ip + i)[0];
+            create_ip_string(ip_dest, IP_STRING_LENGTH, *(&ip.ip + i));
+        }
 
-            // getting description for interface, the string return from function will
-            // look like network_connect: ... but you only want ...
-            const char *netif_desc = esp_netif_get_desc(netif);
-            int desc_offset = strlen(TAG) + 2; // account for colon and space
-            int desc_size = member_size(esp_network_info_t, desc);
-            memcpy(dest->desc, &netif_desc[desc_offset], desc_size);
-            // assigning \0 at the end to be certain that string will terminate
-            dest->desc[desc_size - 1] = '\0';
+        //dns data
+        // ESP_NETIF_DNS_MAIN is 0, ESP_NETIF_DNS_BACKUP is 1
+        for (int i = 0; i < 2; i++)
+        {
+            char *dns_dest = (&dest->dns_info.primary + i)[0];
+            esp_netif_get_dns_info(netif, i, &dns);
+            create_ipv4_dns_string(dns_dest, IP_STRING_LENGTH, dns);
+        }
 
-            dest->is_up = esp_netif_is_netif_up(netif);
+        // getting description for interface, the string return from function will
+        // look like "network_connect: ..." but you only want "..."
+        const char *netif_desc = esp_netif_get_desc(netif);
+        int desc_offset = strlen(TAG) + 2; // account for colon and space
+        int desc_size = member_size(esp_network_info_t, desc);
+        memcpy(dest->desc, &netif_desc[desc_offset], desc_size);
+        // assigning \0 at the end to be certain that string will terminate
+        dest->desc[desc_size - 1] = '\0';
 
-            if (strcmp(netif_desc, "sta")) // if the interface is wifi client
+        dest->connected = esp_netif_is_netif_up(netif);
+
+        dest->wifi_info = NULL;
+        if (strcmp(netif_desc, "sta")) // if the interface is wifi client
+        {
+            wifi_ap_record_t *apinfo = malloc(sizeof(wifi_ap_record_t));
+            // add the wifi_ap_record
+            esp_err_t ap_info_result = esp_wifi_sta_get_ap_info(apinfo);
+            if (ap_info_result == ESP_OK)
             {
-                wifi_ap_record_t *apinfo = malloc(sizeof(wifi_ap_record_t));
-                // add the wifi_ap_record
-                ESP_ERROR_CHECK(esp_wifi_sta_get_ap_info(apinfo));
                 dest->wifi_info = apinfo; // pointer assignment, memory should be freed only in free_esp_network_info
             }
-            else
+            else // if there was a fail, allocated memory won't be needed anymore
             {
-                dest->wifi_info = NULL;
+                free(apinfo);
             }
-            dest++;
         }
+        dest++;
     }
     // freeing netif pointer would delete actual interface it is pointing to
     return ESP_OK;

@@ -14,6 +14,7 @@
 #include "esp_vfs.h"
 #include "cJSON.h"
 
+#include "esp_wifi.h"
 #include "esp_network.h"
 
 static const char *REST_TAG = "esp-rest";
@@ -92,7 +93,7 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     network_interfaces_count++;
 #endif
     esp_network_info_t *interfaces_info = malloc(network_interfaces_count * sizeof(esp_network_info_t));
-    get_esp_network_info(interfaces_info, network_interfaces_count);
+    esp_err_t network_info_result = get_esp_network_info(interfaces_info, network_interfaces_count);
     cJSON *interfaces = cJSON_CreateObject();
 
     for (int i = 0; i < network_interfaces_count; i++)
@@ -101,22 +102,29 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
         cJSON *interface = cJSON_CreateObject();
         cJSON_AddStringToObject(interface, "mac_address", netif->mac);
 
-        cJSON_AddStringToObject(interface, "ip", netif->ip);
-        cJSON_AddStringToObject(interface, "netmask", netif->netmask);
-        cJSON_AddStringToObject(interface, "gw", netif->gw);
-        cJSON_AddStringToObject(interface, "primary_dns", netif->dns_primary);
-        cJSON_AddStringToObject(interface, "secondary_dns", netif->dns_secondary);
+        cJSON *ip_info = cJSON_CreateObject();
+        cJSON_AddStringToObject(ip_info, "ip", netif->ip_info.ip);
+        cJSON_AddStringToObject(ip_info, "netmask", netif->ip_info.netmask);
+        cJSON_AddStringToObject(ip_info, "gw", netif->ip_info.gw);
+        cJSON_AddItemToObject(interface, "ip_info", ip_info);
 
+        cJSON *dns_info = cJSON_CreateObject();
+        cJSON_AddStringToObject(dns_info, "primary_dns", netif->dns_info.primary);
+        cJSON_AddStringToObject(dns_info, "secondary_dns", netif->dns_info.secondary);
+        cJSON_AddItemToObject(interface, "dns", dns_info);
         cJSON_AddStringToObject(interface, "hostname", netif->hostname);
 
-        cJSON_AddBoolToObject(interface, "is_up", netif->is_up);
-        if (strcmp(netif->desc, "sta") == 0)
+        cJSON_AddBoolToObject(interface, "connected", netif->connected);
+        if (strcmp(netif->desc, "sta") == 0) // if netif is wifi client
         {
-            cJSON *wifi_info = cJSON_CreateObject();
-            cJSON_AddStringToObject(wifi_info, "ssid", (char *)netif->wifi_info->ssid);
-            cJSON_AddNumberToObject(wifi_info, "rssi", netif->wifi_info->rssi);
-            cJSON_AddNumberToObject(wifi_info, "auth_mode", (int)netif->wifi_info->authmode);
-            cJSON_AddStringToObject(wifi_info, "country_code", netif->wifi_info->country.cc);
+            cJSON *wifi_info = cJSON_CreateObject(); // create json object
+            if (netif->wifi_info)                    // if pointer is not null, then add info about connection
+            {
+                cJSON_AddStringToObject(wifi_info, "ssid", (char *)netif->wifi_info->ssid);
+                cJSON_AddNumberToObject(wifi_info, "rssi", netif->wifi_info->rssi);
+                cJSON_AddNumberToObject(wifi_info, "auth_mode", (int)netif->wifi_info->authmode);
+                cJSON_AddStringToObject(wifi_info, "country_code", netif->wifi_info->country.cc);
+            }
             cJSON_AddItemToObject(interface, "wifi_info", wifi_info);
         }
         cJSON_AddItemToObject(interfaces, netif->desc, interface);

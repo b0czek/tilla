@@ -75,17 +75,28 @@ esp_netif_t *network_get_netif_from_desc(const char *desc);
 
 #define member_size(type, member) sizeof(((type *)0)->member) // cast nullpointer to struct and get member size
 #define MAC_BYTES 6
+#define IP_STRING_LENGTH 16 
+#define MAC_STRING_LENGH 6*2+6  // 6 bytes, 2 chars per byte, colons between them(5) and \0 at the end
+
+typedef struct {
+    char ip[IP_STRING_LENGTH];
+    char netmask[IP_STRING_LENGTH];
+    char gw[IP_STRING_LENGTH];
+} esp_ip4_info_t;
+
+typedef struct {
+    char primary[IP_STRING_LENGTH];
+    char secondary[IP_STRING_LENGTH];
+} esp_dns_info_t;
+
 typedef struct 
 {
-    char mac[6*2+6]; // 6 bytes, 2 chars per byte, colons between them(5) and \0 at the end
+    char mac[6*2+6];
     char hostname[33]; // max hostname length is 32 characters
-    char ip[16];
-    char netmask[16];
-    char gw[16];
-    char dns_primary[16];
-    char dns_secondary[16];
     char desc[4];
-    bool is_up;
+    esp_ip4_info_t ip_info;
+    esp_dns_info_t dns_info;
+    bool connected;
 
     wifi_ap_record_t *wifi_info;
 } esp_network_info_t;
