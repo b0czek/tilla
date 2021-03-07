@@ -72,6 +72,89 @@ static esp_netif_t *eth_start(void);
 static void eth_stop(void);
 #endif
 
+#if CONFIG_USE_STATIC_DNS
+static ip4_dns_static_config_t static_dns_config = {
+    .main = CONFIG_STATIC_DNS_PRIMARY,
+    .backup = CONFIG_STATIC_DNS_SECONDARY,
+};
+#endif
+
+#if CONFIG_WIFI_USE_STATIC_IP
+static ip4_static_config_t wifi_static_ip_config = {
+    .ip = CONFIG_WIFI_STATIC_IP_ADDRESS,
+    .netmask = CONFIG_WIFI_STATIC_NETMASK,
+    .gw = CONFIG_WIFI_STATIC_GATEWAY_ADDRESS,
+};
+#endif
+
+#if CONFIG_ETHERNET_USE_STATIC_IP
+static ip4_static_config_t ethernet_static_ip_config = {
+    .ip = CONFIG_ETHERNET_STATIC_IP_ADDRESS,
+    .netmask = CONFIG_ETHERNET_STATIC_NETMASK,
+    .gw = CONFIG_ETHERNET_STATIC_GATEWAY_ADDRESS,
+};
+#endif
+
+static char *get_interface_short_name(esp_netif_t *netif)
+{
+    // getting description for interface, the string return from function will
+    // look like "network_connect: ..." but you only want "..."
+    const char *netif_desc = esp_netif_get_desc(netif);
+    char *result = strstr(netif_desc, ":") + 2; //find colon substring and offset it to result
+    return result;
+}
+
+static ip4_union_t ip4_aton(const char *addr)
+{
+    ip4_union_t result = {
+        .ip = esp_ip4addr_aton(addr),
+    };
+    return result;
+}
+#if CONFIG_WIFI_USE_STATIC_IP || CONFIG_ETHERNET_USE_STATIC_IP
+static esp_err_t set_static_ip(esp_netif_t *netif, ip4_static_config_t *ip_config)
+{
+    esp_netif_dhcpc_stop(netif); // dhcp client is started automatically, so stop it
+    esp_netif_ip_info_t ipconfig;
+    for (int i = 0; i < 3; i++) // iterate through ip_config struct and set values in ipconfig
+    {
+        *(&ipconfig.ip + i) = ip4_aton((&ip_config->ip + i)[0]).ip4_addr;
+    }
+    ESP_LOGI(TAG, "Setting static ip for %s - ip: %s, netmask: %s, gateway: %s",
+             get_interface_short_name(netif), ip_config->ip, ip_config->netmask, ip_config->gw);
+    return esp_netif_set_ip_info(netif, &ipconfig);
+}
+#endif
+#if CONFIG_USE_STATIC_DNS
+static esp_netif_dns_info_t
+dns_ip4_aton(const char *addr)
+{
+    esp_netif_dns_info_t result = {
+        .ip = {
+            .type = 0, // type is ipv4
+            .u_addr = {
+                .ip4 = ip4_aton(addr).ip4_addr,
+            },
+        },
+    };
+    return result;
+}
+static esp_err_t set_static_dns(esp_netif_t *netif, ip4_dns_static_config_t *dns_config)
+{
+    for (int i = 0; i < 2; i++)
+    {
+        esp_netif_dns_info_t config = dns_ip4_aton((&dns_config->main + i)[0]);
+        esp_err_t result = esp_netif_set_dns_info(netif, i, &config);
+        if (result != ESP_OK)
+        {
+            ESP_LOGI(TAG, "Something went wrong when setting static DNS for %s", get_interface_short_name(netif));
+            return result;
+        }
+    }
+    ESP_LOGI(TAG, "Setting static DNS for %s - %s and %s", get_interface_short_name(netif), dns_config->main, dns_config->backup);
+    return ESP_OK;
+}
+#endif
 /**
  * @brief Checks the netif description if it contains specified prefix.
  * All netifs created withing common connect component are prefixed with the module TAG,
@@ -88,11 +171,20 @@ static void start(void)
 
 #if CONFIG_CONNECT_WIFI
     s_esp_netif = wifi_start();
+
+#if CONFIG_WIFI_USE_STATIC_IP
+    ESP_ERROR_CHECK(set_static_ip(s_esp_netif, &wifi_static_ip_config));
+#endif
+
     s_active_interfaces++;
 #endif
 
 #if CONFIG_CONNECT_ETHERNET
     s_esp_netif = eth_start();
+#if CONFIG_ETHERNET_USE_STATIC_IP
+    ESP_ERROR_CHECK(set_static_ip(s_esp_netif, &ethernet_static_ip_config));
+
+#endif
     s_active_interfaces++;
 #endif
 
@@ -127,6 +219,11 @@ static void on_got_ip(void *arg, esp_event_base_t event_base,
         ESP_LOGW(TAG, "Got IPv4 from another interface \"%s\": ignored", esp_netif_get_desc(event->esp_netif));
         return;
     }
+
+#if CONFIG_USE_STATIC_DNS
+    ESP_ERROR_CHECK(set_static_dns(event->esp_netif, &static_dns_config));
+#endif
+
     ESP_LOGI(TAG, "Got IPv4 event: Interface \"%s\" address: " IPSTR, esp_netif_get_desc(event->esp_netif), IP2STR(&event->ip_info.ip));
     memcpy(&s_ip_addr, &event->ip_info.ip, sizeof(s_ip_addr));
     xSemaphoreGive(s_semph_get_ip_addrs);
@@ -235,7 +332,6 @@ static esp_netif_t *wifi_start(void)
     char *desc;
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
     esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_WIFI_STA();
     // Prefix the interface description with the module TAG
     // Warning: the interface desc is used in tests to capture actual connection details (IP, gw, mask)
@@ -439,12 +535,6 @@ esp_netif_t *network_get_netif_from_desc(const char *desc)
     return netif;
 }
 
-typedef union
-{
-    esp_ip4_addr_t ip4_addr;
-    uint32_t ip;
-} ip4_union_t;
-
 esp_err_t create_mac_string(char *dest, size_t dest_len, const uint8_t *values, size_t val_len)
 {
     if (dest_len < (val_len * 2 + 1)) /* check that dest is large enough */
@@ -543,19 +633,16 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
             create_ipv4_dns_string(dns_dest, IP_STRING_LENGTH, dns);
         }
 
-        // getting description for interface, the string return from function will
-        // look like "network_connect: ..." but you only want "..."
-        const char *netif_desc = esp_netif_get_desc(netif);
-        int desc_offset = strlen(TAG) + 2; // account for colon and space
+        char *if_name = get_interface_short_name(netif);
         int desc_size = member_size(esp_network_info_t, desc);
-        memcpy(dest->desc, &netif_desc[desc_offset], desc_size);
+        strncpy(dest->desc, if_name, desc_size);
         // assigning \0 at the end to be certain that string will terminate
         dest->desc[desc_size - 1] = '\0';
 
         dest->connected = esp_netif_is_netif_up(netif);
 
         dest->wifi_info = NULL;
-        if (strcmp(netif_desc, "sta")) // if the interface is wifi client
+        if (strcmp(dest->desc, "sta") == 0) // if the interface is wifi client
         {
             wifi_ap_record_t *apinfo = malloc(sizeof(wifi_ap_record_t));
             // add the wifi_ap_record

@@ -10,7 +10,8 @@
 #pragma once
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include "esp_err.h"
@@ -24,7 +25,28 @@ extern "C" {
 #define NETWORK_INTERFACE network_get_netif()
 #endif
 
-/**
+#define member_size(type, member) sizeof(((type *)0)->member) // cast nullpointer to struct and get member size
+#define MAC_BYTES 6
+#define IP_STRING_LENGTH 16
+#define MAC_STRING_LENGH 6 * 2 + 6 // 6 bytes, 2 chars per byte, colons between them(5) and \0 at the end
+
+#if CONFIG_WIFI_USE_STATIC_IP || CONFIG_ETHERNET_USE_STATIC_IP
+   typedef struct
+   {
+      char ip[IP_STRING_LENGTH];
+      char netmask[IP_STRING_LENGTH];
+      char gw[IP_STRING_LENGTH];
+   } ip4_static_config_t;
+#endif
+#if CONFIG_USE_STATIC_DNS
+   typedef struct
+   {
+      char main[IP_STRING_LENGTH];
+      char backup[IP_STRING_LENGTH];
+   } ip4_dns_static_config_t;
+#endif
+
+   /**
  * @brief Configure Wi-Fi or Ethernet, connect, wait for IP
  *
  * This all-in-one helper function is used in protocols examples to
@@ -39,31 +61,32 @@ extern "C" {
  *
  * @return ESP_OK on successful connection
  */
-esp_err_t network_connect(void);
+   esp_err_t
+   network_connect(void);
 
-/**
+   /**
  * Counterpart to network_connect, de-initializes Wi-Fi or Ethernet
  */
-esp_err_t network_disconnect(void);
+   esp_err_t network_disconnect(void);
 
-/**
+   /**
  * @brief Configure stdin and stdout to use blocking I/O
  *
  * This helper function is used in ASIO examples. It wraps installing the
  * UART driver and configuring VFS layer to use UART driver for console I/O.
  */
-esp_err_t network_configure_stdin_stdout(void);
+   esp_err_t network_configure_stdin_stdout(void);
 
-/**
+   /**
  * @brief Returns esp-netif pointer created by network_connect()
  *
  * @note If multiple interfaces active at once, this API return NULL
  * In that case the network_get_netif_from_desc() should be used
  * to get esp-netif pointer based on interface description
  */
-esp_netif_t *network_get_netif(void);
+   esp_netif_t *network_get_netif(void);
 
-/**
+   /**
  * @brief Returns esp-netif pointer created by network_connect() described by
  * the supplied desc field
  *
@@ -71,45 +94,48 @@ esp_netif_t *network_get_netif(void);
  * indicate default WiFi station, "eth" default Ethernet interface.
  *
  */
-esp_netif_t *network_get_netif_from_desc(const char *desc);
+   esp_netif_t *network_get_netif_from_desc(const char *desc);
 
-#define member_size(type, member) sizeof(((type *)0)->member) // cast nullpointer to struct and get member size
-#define MAC_BYTES 6
-#define IP_STRING_LENGTH 16 
-#define MAC_STRING_LENGH 6*2+6  // 6 bytes, 2 chars per byte, colons between them(5) and \0 at the end
+   typedef struct
+   {
+      char ip[IP_STRING_LENGTH];
+      char netmask[IP_STRING_LENGTH];
+      char gw[IP_STRING_LENGTH];
+   } esp_ip4_info_t;
 
-typedef struct {
-    char ip[IP_STRING_LENGTH];
-    char netmask[IP_STRING_LENGTH];
-    char gw[IP_STRING_LENGTH];
-} esp_ip4_info_t;
+   typedef struct
+   {
+      char primary[IP_STRING_LENGTH];
+      char secondary[IP_STRING_LENGTH];
+   } esp_dns_info_t;
 
-typedef struct {
-    char primary[IP_STRING_LENGTH];
-    char secondary[IP_STRING_LENGTH];
-} esp_dns_info_t;
+   typedef struct
+   {
+      char mac[6 * 2 + 6];
+      char hostname[33]; // max hostname length is 32 characters
+      char desc[4];
+      esp_ip4_info_t ip_info;
+      esp_dns_info_t dns_info;
+      bool connected;
 
-typedef struct 
-{
-    char mac[6*2+6];
-    char hostname[33]; // max hostname length is 32 characters
-    char desc[4];
-    esp_ip4_info_t ip_info;
-    esp_dns_info_t dns_info;
-    bool connected;
+      wifi_ap_record_t *wifi_info;
+   } esp_network_info_t;
 
-    wifi_ap_record_t *wifi_info;
-} esp_network_info_t;
+   typedef union
+   {
+      esp_ip4_addr_t ip4_addr;
+      uint32_t ip;
+   } ip4_union_t;
 
-esp_err_t create_mac_string(char *dest, size_t dest_len, const uint8_t *values, size_t val_len);
+   esp_err_t create_mac_string(char *dest, size_t dest_len, const uint8_t *values, size_t val_len);
 
-esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len);
+   esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len);
 
-/**
+   /**
  * @brief function used for deallocating memory from network_info structs
  * @param network_info pointer to struct
  */
-void free_esp_network_info(esp_network_info_t *network_info, int count);
+   void free_esp_network_info(esp_network_info_t *network_info, int count);
 
 #ifdef __cplusplus
 }
