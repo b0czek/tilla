@@ -348,7 +348,8 @@ static esp_netif_t *wifi_start(void)
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_CONNECTED, &on_wifi_connect, netif));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &on_got_ipv6, NULL));
 #endif
-
+    // set hostname defined in config
+    ESP_ERROR_CHECK(esp_netif_set_hostname(netif, CONFIG_WIFI_HOSTNAME));
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
     wifi_config_t wifi_config = {
         .sta = {
@@ -435,6 +436,10 @@ static esp_netif_t *eth_start(void)
     ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_CONNECTED, &on_eth_event, netif));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &on_got_ipv6, NULL));
 #endif
+
+    //set eth hostname
+    ESP_ERROR_CHECK(esp_netif_set_hostname(netif, CONFIG_ETHERNET_HOSTNAME));
+
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
     eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
     phy_config.phy_addr = CONFIG_ETH_PHY_ADDR;

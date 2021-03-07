@@ -20,6 +20,11 @@ menu "Connection Configuration"
                 help
                     WiFi password (WPA or WPA2) for the board to use.
                     Can be left blank if the network has no security set.
+            config WIFI_HOSTNAME
+                string "Interface's hostname"
+                default "tilla-node-1-wifi"
+                help
+                    Hostname that the interface will use while communicating in the network.
             config WIFI_USE_STATIC_IP
                 bool "connect WiFi using statically set IP address"
                 default n
@@ -53,11 +58,17 @@ menu "Connection Configuration"
                 Choose this option to connect with Ethernet
 
         if CONNECT_ETHERNET
+            config ETHERNET_HOSTNAME
+            string "Interface's hostname"
+            default "tilla-node-1-eth"
+            help
+                Hostname that the interface will use while communicating in the network.
             config ETHERNET_USE_STATIC_IP
                 bool "connect ethernet using statically set IP address"
                 default n
                 help
                     Manually assign IP addresses for the ethernet NIC
+                    
             if ETHERNET_USE_STATIC_IP
                     config ETHERNET_STATIC_IP_ADDRESS
                         string "IP Address"
