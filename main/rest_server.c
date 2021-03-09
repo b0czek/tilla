@@ -15,7 +15,8 @@
 #include "cJSON.h"
 
 #include "esp_wifi.h"
-#include "esp_network.h"
+#include "network_tools.h"
+#include "network_info.h"
 
 static const char *REST_TAG = "esp-rest";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -109,8 +110,8 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
         cJSON_AddItemToObject(interface, "ip_info", ip_info);
 
         cJSON *dns_info = cJSON_CreateObject();
-        cJSON_AddStringToObject(dns_info, "primary_dns", netif->dns_info.primary);
-        cJSON_AddStringToObject(dns_info, "secondary_dns", netif->dns_info.secondary);
+        cJSON_AddStringToObject(dns_info, "primary_dns", netif->dns_info.main);
+        cJSON_AddStringToObject(dns_info, "secondary_dns", netif->dns_info.backup);
         cJSON_AddItemToObject(interface, "dns", dns_info);
         cJSON_AddStringToObject(interface, "hostname", netif->hostname);
 

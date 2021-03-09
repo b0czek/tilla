@@ -24,7 +24,7 @@
 #include "freertos/event_groups.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
-
+#include "network_tools.h"
 #ifdef CONFIG_CONNECT_IPV6
 #define MAX_IP6_ADDRS_PER_NETIF (5)
 #define NR_OF_IP_ADDRESSES_TO_WAIT_FOR (s_active_interfaces * 2)
@@ -61,7 +61,7 @@ static const char *s_ipv6_addr_types[] = {
     "ESP_IP6_ADDR_IS_IPV4_MAPPED_IPV6"};
 #endif
 
-static const char *TAG = "network_connect";
+const char *TAG = "network_connect";
 
 #if CONFIG_CONNECT_WIFI
 static esp_netif_t *wifi_start(void);
@@ -73,14 +73,14 @@ static void eth_stop(void);
 #endif
 
 #if CONFIG_USE_STATIC_DNS
-static ip4_dns_static_config_t static_dns_config = {
+static esp_dns_info_t static_dns_config = {
     .main = CONFIG_STATIC_DNS_PRIMARY,
     .backup = CONFIG_STATIC_DNS_SECONDARY,
 };
 #endif
 
 #if CONFIG_WIFI_USE_STATIC_IP
-static ip4_static_config_t wifi_static_ip_config = {
+static esp_ip4_info_t wifi_static_ip_config = {
     .ip = CONFIG_WIFI_STATIC_IP_ADDRESS,
     .netmask = CONFIG_WIFI_STATIC_NETMASK,
     .gw = CONFIG_WIFI_STATIC_GATEWAY_ADDRESS,
@@ -88,82 +88,12 @@ static ip4_static_config_t wifi_static_ip_config = {
 #endif
 
 #if CONFIG_ETHERNET_USE_STATIC_IP
-static ip4_static_config_t ethernet_static_ip_config = {
+static esp_ip4_info_t ethernet_static_ip_config = {
     .ip = CONFIG_ETHERNET_STATIC_IP_ADDRESS,
     .netmask = CONFIG_ETHERNET_STATIC_NETMASK,
     .gw = CONFIG_ETHERNET_STATIC_GATEWAY_ADDRESS,
 };
 #endif
-
-static char *get_interface_short_name(esp_netif_t *netif)
-{
-    // getting description for interface, the string return from function will
-    // look like "network_connect: ..." but you only want "..."
-    const char *netif_desc = esp_netif_get_desc(netif);
-    char *result = strstr(netif_desc, ":") + 2; //find colon substring and offset it to result
-    return result;
-}
-
-static ip4_union_t ip4_aton(const char *addr)
-{
-    ip4_union_t result = {
-        .ip = esp_ip4addr_aton(addr),
-    };
-    return result;
-}
-#if CONFIG_WIFI_USE_STATIC_IP || CONFIG_ETHERNET_USE_STATIC_IP
-static esp_err_t set_static_ip(esp_netif_t *netif, ip4_static_config_t *ip_config)
-{
-    esp_netif_dhcpc_stop(netif); // dhcp client is started automatically, so stop it
-    esp_netif_ip_info_t ipconfig;
-    for (int i = 0; i < 3; i++) // iterate through ip_config struct and set values in ipconfig
-    {
-        *(&ipconfig.ip + i) = ip4_aton((&ip_config->ip + i)[0]).ip4_addr;
-    }
-    ESP_LOGI(TAG, "Setting static ip for %s - ip: %s, netmask: %s, gateway: %s",
-             get_interface_short_name(netif), ip_config->ip, ip_config->netmask, ip_config->gw);
-    return esp_netif_set_ip_info(netif, &ipconfig);
-}
-#endif
-#if CONFIG_USE_STATIC_DNS
-static esp_netif_dns_info_t
-dns_ip4_aton(const char *addr)
-{
-    esp_netif_dns_info_t result = {
-        .ip = {
-            .type = 0, // type is ipv4
-            .u_addr = {
-                .ip4 = ip4_aton(addr).ip4_addr,
-            },
-        },
-    };
-    return result;
-}
-static esp_err_t set_static_dns(esp_netif_t *netif, ip4_dns_static_config_t *dns_config)
-{
-    for (int i = 0; i < 2; i++)
-    {
-        esp_netif_dns_info_t config = dns_ip4_aton((&dns_config->main + i)[0]);
-        esp_err_t result = esp_netif_set_dns_info(netif, i, &config);
-        if (result != ESP_OK)
-        {
-            ESP_LOGI(TAG, "Something went wrong when setting static DNS for %s", get_interface_short_name(netif));
-            return result;
-        }
-    }
-    ESP_LOGI(TAG, "Setting static DNS for %s - %s and %s", get_interface_short_name(netif), dns_config->main, dns_config->backup);
-    return ESP_OK;
-}
-#endif
-/**
- * @brief Checks the netif description if it contains specified prefix.
- * All netifs created withing common connect component are prefixed with the module TAG,
- * so it returns true if the specified netif is owned by this module
- */
-static bool is_our_netif(const char *prefix, esp_netif_t *netif)
-{
-    return strncmp(prefix, esp_netif_get_desc(netif), strlen(prefix) - 1) == 0;
-}
 
 /* set up connection, Wi-Fi and/or Ethernet */
 static void start(void)
@@ -537,141 +467,4 @@ esp_netif_t *network_get_netif_from_desc(const char *desc)
     }
     free(expected_desc);
     return netif;
-}
-
-esp_err_t create_mac_string(char *dest, size_t dest_len, const uint8_t *values, size_t val_len)
-{
-    if (dest_len < (val_len * 2 + 1)) /* check that dest is large enough */
-        return ESP_ERR_INVALID_ARG;
-    *dest = '\0'; /* in case val_len==0 */
-    while (val_len--)
-    {
-        /* sprintf directly to where dest points */
-        sprintf(dest, "%02X", *values);
-        dest += 2;
-        ++values;
-        if (val_len) /* if its not the last byte, then add : separator */
-        {
-            sprintf(dest, "%c", ':');
-            dest++;
-        }
-    }
-    return ESP_OK;
-}
-esp_err_t create_ip_string(char *dest, size_t dest_len, esp_ip4_addr_t ip4_address)
-{
-    int buff_len = IP_STRING_LENGTH;
-    char buff[buff_len];
-    if (buff_len > dest_len)
-    {
-        return ESP_ERR_INVALID_ARG;
-    }
-    ip4_union_t addr = {.ip4_addr = ip4_address};
-    uint32_t ip = addr.ip;
-    unsigned char bytes[4];
-    bytes[0] = ip & 0xFF;
-    bytes[1] = (ip >> 8) & 0xFF;
-    bytes[2] = (ip >> 16) & 0xFF;
-    bytes[3] = (ip >> 24) & 0xFF;
-    snprintf(buff, buff_len, "%d.%d.%d.%d", bytes[0], bytes[1], bytes[2], bytes[3]);
-    strncpy(dest, (char *)buff, buff_len);
-    return ESP_OK;
-}
-
-esp_err_t create_ipv4_dns_string(char *dest, size_t dest_len, esp_netif_dns_info_t dns)
-{
-    if (dns.ip.type == 0) // if ip is ipv4, then proceed
-    {
-        return create_ip_string(dest, dest_len, dns.ip.u_addr.ip4);
-    }
-    else // if its ipv6, then set string to empty and return
-    {
-        dest[0] = '\0';
-        return ESP_ERR_NOT_SUPPORTED;
-    }
-    return ESP_OK;
-}
-
-esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
-{
-    esp_netif_t *netif = NULL;
-    esp_netif_ip_info_t ip;
-    esp_netif_dns_info_t dns;
-    if (esp_netif_get_nr_of_ifs() > dest_len)
-    {
-        return ESP_ERR_INVALID_ARG;
-    }
-    for (int i = 0; i < esp_netif_get_nr_of_ifs(); ++i)
-    {
-        netif = esp_netif_next(netif);
-        if (!is_our_netif(TAG, netif)) // skip if interface is not "our" somehow
-        {
-            continue;
-        }
-
-        // fetching mac address
-        uint8_t mac[6];
-        esp_netif_get_mac(netif, mac);
-        // formatting mac bytes into string
-        create_mac_string(dest->mac, MAC_STRING_LENGH, mac, MAC_BYTES);
-
-        const char *hostname = NULL;
-        esp_netif_get_hostname(netif, &hostname);
-        strcpy(dest->hostname, hostname);
-
-        // fetching ip data
-        ESP_ERROR_CHECK(esp_netif_get_ip_info(netif, &ip));
-
-        for (int i = 0; i < 3; i++) // iterate for ip,netmask,gw
-        {
-            char *ip_dest = (&dest->ip_info.ip + i)[0];
-            create_ip_string(ip_dest, IP_STRING_LENGTH, *(&ip.ip + i));
-        }
-
-        //dns data
-        // ESP_NETIF_DNS_MAIN is 0, ESP_NETIF_DNS_BACKUP is 1
-        for (int i = 0; i < 2; i++)
-        {
-            char *dns_dest = (&dest->dns_info.primary + i)[0];
-            esp_netif_get_dns_info(netif, i, &dns);
-            create_ipv4_dns_string(dns_dest, IP_STRING_LENGTH, dns);
-        }
-
-        char *if_name = get_interface_short_name(netif);
-        int desc_size = member_size(esp_network_info_t, desc);
-        strncpy(dest->desc, if_name, desc_size);
-        // assigning \0 at the end to be certain that string will terminate
-        dest->desc[desc_size - 1] = '\0';
-
-        dest->connected = esp_netif_is_netif_up(netif);
-
-        dest->wifi_info = NULL;
-        if (strcmp(dest->desc, "sta") == 0) // if the interface is wifi client
-        {
-            wifi_ap_record_t *apinfo = malloc(sizeof(wifi_ap_record_t));
-            // add the wifi_ap_record
-            esp_err_t ap_info_result = esp_wifi_sta_get_ap_info(apinfo);
-            if (ap_info_result == ESP_OK)
-            {
-                dest->wifi_info = apinfo; // pointer assignment, memory should be freed only in free_esp_network_info
-            }
-            else // if there was a fail, allocated memory won't be needed anymore
-            {
-                free(apinfo);
-            }
-        }
-        dest++;
-    }
-    // freeing netif pointer would delete actual interface it is pointing to
-    return ESP_OK;
-}
-
-void free_esp_network_info(esp_network_info_t *network_info, int count)
-{
-    for (int i = 0; i < count; i++)
-    {
-        free((network_info + i)->wifi_info);
-    }
-    free(network_info);
-    network_info = NULL;
 }
