@@ -183,7 +183,6 @@ static void start(void)
     s_esp_netif = eth_start();
 #if CONFIG_ETHERNET_USE_STATIC_IP
     ESP_ERROR_CHECK(set_static_ip(s_esp_netif, &ethernet_static_ip_config));
-
 #endif
     s_active_interfaces++;
 #endif
