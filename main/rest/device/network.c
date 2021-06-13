@@ -22,7 +22,11 @@ cJSON *get_network_info_json()
 {
     esp_network_info_t *interfaces_info = get_network_info();
     cJSON *interfaces = cJSON_CreateObject();
-
+    if (interfaces_info == NULL)
+    {
+        cJSON_AddBoolToObject(interfaces, "error", false);
+        return interfaces;
+    }
     for (int i = 0; i < NETWORK_INTERFACES_COUNT; i++)
     {
         esp_network_info_t *netif = interfaces_info + i;
@@ -63,5 +67,6 @@ cJSON *get_network_info_json()
     }
     // cjson actually duplicates all the data so freeing original data's memory is safe
     free_esp_network_info(interfaces_info, NETWORK_INTERFACES_COUNT);
+    cJSON_AddBoolToObject(interfaces, "error", false);
     return interfaces;
 }
