@@ -147,6 +147,21 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     free_esp_network_info(interfaces_info, network_interfaces_count);
     return ESP_OK;
 }
+static esp_err_t device_restart_handler(httpd_req_t *req)
+{
+
+    httpd_resp_set_type(req, "application/json");
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddBoolToObject(root, "ok", true);
+    const char *sys_info = cJSON_Print(root);
+    httpd_resp_sendstr(req, sys_info);
+    free((void *)sys_info);
+    cJSON_Delete(root);
+
+    ESP_LOGW("device_restart_handler", "requested device restart");
+    esp_restart();
+    return ESP_OK;
+}
 
 esp_err_t start_rest_server(const char *base_path)
 {
@@ -173,13 +188,20 @@ esp_err_t start_rest_server(const char *base_path)
     // prefetch chip info data as it's constant
     chip_info = get_chip_info();
 
-    /* URI handler for fetching uptime data */
+    /* URI handler for fetching data about device vitals */
     httpd_uri_t device_data_get_uri = {
         .uri = "/api/v1/device",
         .method = HTTP_GET,
         .handler = device_data_get_handler,
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &device_data_get_uri);
+
+    httpd_uri_t reset_device_uri = {
+        .uri = "/api/v1/reset",
+        .method = HTTP_GET,
+        .handler = device_restart_handler,
+        .user_ctx = rest_context};
+    httpd_register_uri_handler(server, &reset_device_uri);
 
     return ESP_OK;
 err_start:
