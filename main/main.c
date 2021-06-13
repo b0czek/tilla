@@ -1,20 +1,22 @@
 #include "sdkconfig.h"
 #include "driver/gpio.h"
+#include "sdmmc_cmd.h"
+#include "mdns.h"
+#include "lwip/apps/netbiosns.h"
+
 #include "esp_vfs_semihost.h"
 #include "esp_vfs_fat.h"
 #include "esp_spiffs.h"
-#include "sdmmc_cmd.h"
 #include "nvs_flash.h"
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "mdns.h"
-#include "lwip/apps/netbiosns.h"
+
 #include "network.h"
+#include "rest_server.h"
 
 #define MDNS_INSTANCE "esp home web server"
 
-esp_err_t start_rest_server(const char *base_path);
 void start_reading_sensors();
 static void initialise_mdns(void)
 {
