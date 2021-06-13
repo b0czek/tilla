@@ -84,7 +84,12 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
 
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "uptime", esp_timer_get_time() / 1000); // return uptime in milliseconds
+
+    cJSON *stats = cJSON_CreateObject();
+    cJSON_AddNumberToObject(stats, "uptime", esp_timer_get_time() / 1000);      // return uptime in milliseconds
+    cJSON_AddNumberToObject(stats, "available_heap", esp_get_free_heap_size()); // return free heap size in bytes
+
+    cJSON_AddItemToObject(root, "stats", stats);
 
     int network_interfaces_count = 0;
 #ifdef CONFIG_CONNECT_ETHERNET
