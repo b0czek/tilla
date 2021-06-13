@@ -233,11 +233,11 @@ menu "Connection Configuration"
     endmenu
 
     config USE_STATIC_DNS
-        bool "set WiFi's DNS addresses statically"
+        bool "set DNS addresses statically"
         default y if WIFI_USE_STATIC_IP || ETHERNET_USE_STATIC_IP
         default n if !WIFI_USE_STATIC_IP && !ETHERNET_USE_STATIC_IP
         help
-            Manaully assign DNS addresses for the board's wifi
+            Manaully assign DNS addresses for the board's networking
     if USE_STATIC_DNS
             config STATIC_DNS_PRIMARY
                 string "Primary DNS Address"
