@@ -1,7 +1,9 @@
 #include <string.h>
-#include "esp_network.h"
+
+#include "network.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
+
 #include "network_tools.h"
 
 esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)

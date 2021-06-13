@@ -18,10 +18,9 @@
 #include "esp_log.h"
 #include "mdns.h"
 #include "lwip/apps/netbiosns.h"
-#include "esp_network.h"
+#include "network.h"
 
 #define MDNS_INSTANCE "esp home web server"
-
 
 esp_err_t start_rest_server(const char *base_path);
 void start_reading_sensors();
@@ -33,18 +32,16 @@ static void initialise_mdns(void)
 
     mdns_txt_item_t serviceTxtData[] = {
         {"board", "esp32"},
-        {"path", "/"}
-    };
+        {"path", "/"}};
 
     ESP_ERROR_CHECK(mdns_service_add("ESP32-WebServer", "_http", "_tcp", 80, serviceTxtData,
                                      sizeof(serviceTxtData) / sizeof(serviceTxtData[0])));
 }
 
-
 void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
-    ESP_ERROR_CHECK(esp_netif_init()); // initialize tcp/ip stack
+    ESP_ERROR_CHECK(esp_netif_init());                // initialize tcp/ip stack
     ESP_ERROR_CHECK(esp_event_loop_create_default()); // create an event loop
     initialise_mdns();
     netbiosns_init();

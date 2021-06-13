@@ -1,15 +1,12 @@
-/* Common functions for protocol examples, to establish Wi-Fi or Ethernet connection.
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
- */
-
 #include <string.h>
-#include "esp_network.h"
-#include "sdkconfig.h"
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include "driver/gpio.h"
+#include "lwip/err.h"
+#include "lwip/sys.h"
+
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "esp_wifi_default.h"
@@ -18,13 +15,11 @@
 #endif
 #include "esp_log.h"
 #include "esp_netif.h"
-#include "driver/gpio.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "lwip/err.h"
-#include "lwip/sys.h"
+#include "sdkconfig.h"
+
+#include "network.h"
 #include "network_tools.h"
+
 #ifdef CONFIG_CONNECT_IPV6
 #define MAX_IP6_ADDRS_PER_NETIF (5)
 #define NR_OF_IP_ADDRESSES_TO_WAIT_FOR (s_active_interfaces * 2)
