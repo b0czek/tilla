@@ -1,11 +1,3 @@
-/* HTTP Restful API Server
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include <string.h>
 #include <fcntl.h>
 #include "esp_http_server.h"
@@ -86,8 +78,9 @@ static esp_err_t device_data_get_handler(httpd_req_t *req)
     cJSON *root = cJSON_CreateObject();
 
     cJSON *stats = cJSON_CreateObject();
-    cJSON_AddNumberToObject(stats, "uptime", esp_timer_get_time() / 1000);      // return uptime in milliseconds
-    cJSON_AddNumberToObject(stats, "available_heap", esp_get_free_heap_size()); // return free heap size in bytes
+    cJSON_AddNumberToObject(stats, "uptime", esp_timer_get_time() / 1000);                        // return uptime in milliseconds
+    cJSON_AddNumberToObject(stats, "available_heap", esp_get_free_heap_size());                   // return free heap size in bytes
+    cJSON_AddNumberToObject(stats, "available_internal_heap", esp_get_free_internal_heap_size()); // return free internal heap size in bytes
 
     cJSON_AddItemToObject(root, "stats", stats);
 
