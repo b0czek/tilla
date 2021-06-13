@@ -9,7 +9,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 
-#include "network.h"
+#include "network_tools.h"
 
 bool is_our_netif(const char *prefix, esp_netif_t *netif)
 {

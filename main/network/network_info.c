@@ -2,8 +2,8 @@
 
 #include "esp_netif.h"
 #include "esp_wifi.h"
-
 #include "network.h"
+
 #include "network_tools.h"
 
 esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
@@ -51,13 +51,16 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
             dns_ip4_ntoa(dns_dest, IP_STRING_LENGTH, dns);
         }
 
-        char *if_name = get_interface_short_name(netif);
-        int desc_size = member_size(esp_network_info_t, desc);
-        strncpy(dest->desc, if_name, desc_size);
+        strcpy(dest->desc, get_interface_short_name(netif));
         // assigning \0 at the end to be certain that string will terminate
-        dest->desc[desc_size - 1] = '\0';
+        dest->desc[member_size(esp_network_info_t, desc) - 1] = '\0';
 
         dest->connected = esp_netif_is_netif_up(netif);
+
+        // check if dhcpc is stopped, thus the address is static
+        esp_netif_dhcp_status_t dhcp_status;
+        esp_netif_dhcpc_get_status(netif, &dhcp_status);
+        dest->is_static = dhcp_status == ESP_NETIF_DHCP_STOPPED;
 
         dest->wifi_info = NULL;
         if (strcmp(dest->desc, "sta") == 0) // if the interface is wifi client

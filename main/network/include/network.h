@@ -85,7 +85,7 @@ extern "C"
       esp_ip4_info_t ip_info;
       esp_dns_info_t dns_info;
       bool connected;
-
+      bool is_static;
       wifi_ap_record_t *wifi_info;
    } esp_network_info_t;
 

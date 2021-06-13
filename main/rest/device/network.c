@@ -46,6 +46,7 @@ cJSON *get_network_info_json()
         cJSON_AddStringToObject(interface, "hostname", netif->hostname);
 
         cJSON_AddBoolToObject(interface, "connected", netif->connected);
+        cJSON_AddBoolToObject(interface, "is_static", netif->is_static);
         if (strcmp(netif->desc, "sta") == 0) // if netif is wifi client
         {
             cJSON *wifi_info = cJSON_CreateObject(); // create json object
