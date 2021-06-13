@@ -1,3 +1,5 @@
+#pragma once
+
 #include "network.h"
 
 esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len);
