@@ -18,9 +18,25 @@ cJSON *get_chip_info_json()
     // add chip_id(factory programmed mac address)
     uint8_t mac[MAC_BYTES];
     esp_efuse_mac_get_default(mac);
-    int id_len = MAC_STRING_LENGH;
-    char id[id_len];
-    create_mac_string(id, id_len, mac, MAC_BYTES);
+    char id[MAC_STRING_LENGH];
+    create_mac_string(id, MAC_STRING_LENGH, mac, MAC_BYTES);
     cJSON_AddStringToObject(chip, "chip_id", id);
+
     return chip;
+}
+
+/* Handler for getting device's chip info */
+esp_err_t chip_data_get_handler(httpd_req_t *req)
+{
+
+    httpd_resp_set_type(req, "application/json");
+
+    cJSON *root = get_chip_info_json();
+
+    const char *response = cJSON_PrintUnformatted(root);
+    httpd_resp_sendstr(req, response);
+
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
 }

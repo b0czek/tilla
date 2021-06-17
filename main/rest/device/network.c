@@ -71,3 +71,17 @@ cJSON *get_network_info_json()
     cJSON_AddBoolToObject(interfaces, "error", false);
     return interfaces;
 }
+esp_err_t network_data_get_handler(httpd_req_t *req)
+{
+
+    httpd_resp_set_type(req, "application/json");
+
+    cJSON *root = get_network_info_json();
+
+    const char *response = cJSON_PrintUnformatted(root);
+    httpd_resp_sendstr(req, response);
+
+    free((void *)response);
+    cJSON_Delete(root);
+    return ESP_OK;
+}

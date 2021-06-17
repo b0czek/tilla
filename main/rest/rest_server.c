@@ -2,7 +2,6 @@
 #include <fcntl.h>
 #include "esp_http_server.h"
 #include "esp_log.h"
-#include "esp_vfs.h"
 #include "cJSON.h"
 
 #include "rest_server.h"
@@ -18,14 +17,6 @@ static const char *REST_TAG = "esp-rest";
             goto goto_tag;                                                             \
         }                                                                              \
     } while (0)
-
-#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
-#define SCRATCH_BUFSIZE (10240)
-typedef struct rest_server_context
-{
-    char base_path[ESP_VFS_PATH_MAX + 1];
-    char scratch[SCRATCH_BUFSIZE];
-} rest_server_context_t;
 
 float get_readings();
 bool get_error_state();
@@ -84,13 +75,8 @@ esp_err_t start_rest_server(const char *base_path)
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &temperature_data_get_uri);
 
-    /* URI handler for fetching data about device vitals */
-    httpd_uri_t device_data_get_uri = {
-        .uri = "/api/v1/device",
-        .method = HTTP_GET,
-        .handler = device_data_get_handler,
-        .user_ctx = rest_context};
-    httpd_register_uri_handler(server, &device_data_get_uri);
+    /* URI handlers for fetching data about device vitals */
+    register_device_handlers(server, rest_context);
 
     httpd_uri_t reset_device_uri = {
         .uri = "/api/v1/reset",
