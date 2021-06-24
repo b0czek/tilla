@@ -11,6 +11,29 @@ static void remove_leading_slash(const char **string)
     }
 }
 
+static json_node_t *root = NULL;
+
+static esp_err_t json_httpd_handler(httpd_req_t *req)
+{
+    json_node_t *found_node = json_endpoint_find(root, req->uri, req->method);
+
+    if (found_node == NULL)
+    {
+        httpd_resp_send_404(req);
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+
+    cJSON *response = (*found_node->endpoint->handler)(req);
+    const char *response_string = cJSON_PrintUnformatted(response);
+    httpd_resp_sendstr(req, response_string);
+
+    free((void *)response_string);
+    cJSON_Delete(response);
+    return ESP_OK;
+}
+
 /**
  * @returns pointer to appended child node in root node
  * 
@@ -47,11 +70,9 @@ static json_node_t *json_child_append(json_node_t *root_node, const json_node_t 
     return appended_node;
 }
 
-json_node_t *json_endpoint_find(json_node_t *root_node, const char *path)
+json_node_t *json_endpoint_find(json_node_t *root_node, const char *path, httpd_method_t method)
 {
     remove_leading_slash(&path);
-    printf("path %s\n", path);
-    printf("root uri %s\n", root_node->uri_fragment);
 
     int node_uri_len = strlen(root_node->uri_fragment);
     if (strncmp(path, root_node->uri_fragment, node_uri_len) != 0)
@@ -59,8 +80,11 @@ json_node_t *json_endpoint_find(json_node_t *root_node, const char *path)
         return NULL;
     }
     path += node_uri_len;
-    printf("searched in endpoint %s\n", path);
-    if (*path == '\0')
+
+    // check if found node is an endpoint and if the method matches
+    if (*path == '\0' &&
+        root_node->endpoint != NULL &&
+        root_node->endpoint->method == method)
     {
         return root_node;
     }
@@ -68,7 +92,7 @@ json_node_t *json_endpoint_find(json_node_t *root_node, const char *path)
     for (int i = 0; i < root_node->child_nodes_count; i++)
     {
         json_node_t *searched_node = (root_node->child_nodes + i);
-        json_node_t *found_node = json_endpoint_find(searched_node, path);
+        json_node_t *found_node = json_endpoint_find(searched_node, path, method);
         if (found_node != NULL)
         {
             return found_node;
@@ -77,10 +101,80 @@ json_node_t *json_endpoint_find(json_node_t *root_node, const char *path)
     return NULL;
 }
 
-void json_endpoint_add(json_node_t *root_node, const char *endpoint_path, json_node_endpoint_t *endpoint)
+bool json_endpoint_delete(json_node_t *deleted_node)
+{
+    // dont delete the anything if its root node
+    if (deleted_node->parent_node == NULL)
+    {
+        return false;
+    }
+    // if its intermediate node, but it has its own endpoint, delete the endpoint
+    if (deleted_node->child_nodes_count > 0 && deleted_node->endpoint != NULL)
+    {
+        free(deleted_node->endpoint);
+        deleted_node->endpoint = NULL;
+        return true;
+    }
+    // if its intermediate node, dont delete it
+    else if (deleted_node->endpoint == NULL)
+    {
+        return false;
+    }
+
+    // if the node is at the end of the tree, delete it
+
+    // destroy the node's members
+    free(deleted_node->uri_fragment);
+    free(deleted_node->endpoint);
+
+    int parents_children_count = deleted_node->parent_node->child_nodes_count;
+    // search for deleted node reference in parents children array and remove it
+    for (int i = 0; i < parents_children_count; i++)
+    {
+        json_node_t *iterated_node = (deleted_node->parent_node->child_nodes + i);
+        // if iterated node is the deleted one
+        if (iterated_node == deleted_node)
+        {
+            // if child node is not the last one, shift all other members
+            if ((i + 1) != parents_children_count)
+            {
+                int children_to_move = parents_children_count - (i + 1);
+                memmove(iterated_node, (iterated_node + 1), sizeof(json_node_t) * children_to_move);
+            }
+            // realloc and free removes the node to be deleted
+            // if parent has more than 1 child, reallocate their memory
+            if (parents_children_count > 1)
+            {
+                // reallocate memory with 1 children less
+                realloc(deleted_node->parent_node->child_nodes, sizeof(json_node_t) * parents_children_count);
+            }
+            // if parent has 1 child, free whole memory
+            else
+            {
+                free(deleted_node->parent_node->child_nodes);
+                deleted_node->parent_node->child_nodes = NULL;
+            }
+
+            // decrement children count
+            deleted_node->parent_node->child_nodes_count--;
+            break;
+        }
+    }
+
+    // if deleted node is the only child and the parent node is not an endpoint itself
+    // then delete parent node as well
+    if (deleted_node->parent_node->child_nodes_count == 1 &&
+        deleted_node->parent_node->endpoint == NULL)
+    {
+        json_endpoint_delete(deleted_node->parent_node);
+    }
+    return true;
+}
+
+json_node_t *json_endpoint_add(json_node_t *root_node, const char *endpoint_path, json_node_endpoint_t *endpoint)
 {
     remove_leading_slash(&endpoint_path);
-    printf("endpoint before verification: %s \n", endpoint_path);
+
     // check if endpoint path starts with root's uri
     if (strncmp(endpoint_path, root_node->uri_fragment, strlen(root_node->uri_fragment)) == 0)
     {
@@ -113,11 +207,26 @@ void json_endpoint_add(json_node_t *root_node, const char *endpoint_path, json_n
     }
 
     free(path);
-    printf("endpoint after verification: %s\n", endpoint_path);
+    return appended_node;
 }
 
 json_node_t *json_endpoint_init(httpd_handle_t server, const char *base_path)
 {
+
+    // register handlers in http server
+    httpd_uri_t json_endpoint_uri_get = {
+        .uri = base_path,
+        .method = HTTP_GET,
+        .handler = json_httpd_handler,
+        .user_ctx = NULL};
+    httpd_register_uri_handler(server, &json_endpoint_uri_get);
+    httpd_uri_t json_endpoint_uri_post = {
+        .uri = base_path,
+        .method = HTTP_POST,
+        .handler = json_httpd_handler,
+        .user_ctx = NULL};
+    httpd_register_uri_handler(server, &json_endpoint_uri_post);
+
     remove_leading_slash(&base_path);
 
     json_node_t *root_node = malloc(sizeof(json_node_t));
@@ -144,6 +253,6 @@ json_node_t *json_endpoint_init(httpd_handle_t server, const char *base_path)
     root_node->parent_node = NULL;
     root_node->child_nodes = NULL;
     root_node->child_nodes_count = 0;
-
+    root = root_node;
     return root_node;
 }
