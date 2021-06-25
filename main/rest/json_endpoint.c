@@ -1,5 +1,5 @@
 #include <stdlib.h>
-
+#include <cJSON.h>
 #include "json_endpoint.h"
 
 // omit slash if it starts the string
@@ -12,6 +12,44 @@ static void remove_leading_slash(const char **string)
 }
 
 static json_node_t *root = NULL;
+
+static cJSON *generate_tree(json_node_t *node)
+{
+    cJSON *nodes = cJSON_CreateObject();
+    for (int i = 0; i < node->child_nodes_count; i++)
+    {
+        json_node_t *iterated_node = (node->child_nodes + i);
+        cJSON *iterated_tree = generate_tree(iterated_node);
+
+        char *tree_name = iterated_node->uri_fragment;
+        // if the node is an endpoint and not just an intermediate node, append * at the end of its name
+        if (iterated_node->endpoint != NULL)
+        {
+            int uri_fragment_len = strlen(iterated_node->uri_fragment);
+            tree_name = malloc(uri_fragment_len + 2);
+            memcpy(tree_name, iterated_node->uri_fragment, uri_fragment_len);
+            memcpy(tree_name + uri_fragment_len, &"*", 2);
+        }
+
+        cJSON_AddItemToObject(nodes, tree_name, iterated_tree);
+        if (iterated_node->endpoint != NULL)
+        {
+            free(tree_name);
+        }
+    }
+    return nodes;
+}
+
+cJSON *get_routing_tree_json(httpd_req_t *req)
+{
+    // create a fake father node to the root node and kickstart the recursive function
+    json_node_t *grandfather_node = calloc(1, sizeof(json_node_t));
+    grandfather_node->child_nodes = root;
+    grandfather_node->child_nodes_count = 1;
+    cJSON *tree = generate_tree(grandfather_node);
+    free(grandfather_node);
+    return tree;
+}
 
 static esp_err_t json_httpd_handler(httpd_req_t *req)
 {
@@ -184,15 +222,16 @@ json_node_t *json_endpoint_add(json_node_t *root_node, const char *endpoint_path
 
     remove_leading_slash(&endpoint_path);
 
-    // copy endpoint_path to mutable variable
-    char *path = malloc(strlen(endpoint_path) + 1);
-    strcpy(path, endpoint_path);
+    char *fragment = strstr(endpoint_path, "/");
 
-    char *fragment = strtok(path, "/");
+    // if there is a slash, copy the trimmed fragment, if not, copy whole stirng
+    int uri_length = fragment == NULL ? strlen(endpoint_path) + 1 : fragment - endpoint_path + 1;
+    char *uri_fragment = malloc(uri_length);
+    strlcpy(uri_fragment, endpoint_path, uri_length);
 
     json_node_t new_node_config = {
         // path is trimmed in process of strtok
-        .uri_fragment = path,
+        .uri_fragment = uri_fragment,
         // if there is not path to split anymore, add the endpoint config
         .endpoint = fragment == NULL ? endpoint : NULL,
         .parent_node = root_node,
@@ -200,13 +239,13 @@ json_node_t *json_endpoint_add(json_node_t *root_node, const char *endpoint_path
         .child_nodes_count = 0};
 
     json_node_t *appended_node = json_child_append(root_node, &new_node_config);
+    free(uri_fragment);
 
     if (fragment != NULL)
     {
         json_endpoint_add(appended_node, endpoint_path, endpoint);
     }
 
-    free(path);
     return appended_node;
 }
 

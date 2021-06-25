@@ -24,6 +24,8 @@ typedef struct json_node_t
     uint32_t child_nodes_count;
 } json_node_t;
 
+cJSON *get_routing_tree_json(httpd_req_t *req);
+
 json_node_t *json_endpoint_find(json_node_t *root_node, const char *path, httpd_method_t method);
 bool json_endpoint_delete(json_node_t *deleted_node);
 json_node_t *json_endpoint_add(json_node_t *root_node, const char *endpoint_path, json_node_endpoint_t *endpoint);
