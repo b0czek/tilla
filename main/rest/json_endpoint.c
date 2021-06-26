@@ -271,45 +271,64 @@ json_node_t *json_endpoint_add(json_node_t *root_node, const char *endpoint_path
     return appended_node;
 }
 
-json_node_t *json_endpoint_init(httpd_handle_t server, const char *base_path)
+static char *trim_uri(const char *uri)
 {
 
-    // register handlers in http server
-    httpd_uri_t json_endpoint_uri_get = {
-        .uri = base_path,
-        .method = HTTP_GET,
-        .handler = json_httpd_handler,
-        .user_ctx = NULL};
-    httpd_register_uri_handler(server, &json_endpoint_uri_get);
-    httpd_uri_t json_endpoint_uri_post = {
-        .uri = base_path,
-        .method = HTTP_POST,
-        .handler = json_httpd_handler,
-        .user_ctx = NULL};
-    httpd_register_uri_handler(server, &json_endpoint_uri_post);
+    int uri_len = strlen(uri);
+    const char *last_character = uri + uri_len - 1;
+    // if base_path has *,? or / on the end, then ignore it
+    while (*last_character == '/' ||
+           *last_character == '?' ||
+           *last_character == '*')
+    {
+        uri_len--;
+        last_character = uri + uri_len - 1;
+    }
 
-    remove_leading_slash(&base_path);
+    char *trimmed_uri = malloc(uri_len + 1); //acount for \0
+    strncpy(trimmed_uri, uri, uri_len);
+    trimmed_uri[uri_len] = '\0'; // add \0 explicitly
+    return trimmed_uri;
+}
+
+static esp_err_t register_uri_handler(httpd_handle_t server, const char *uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t *r))
+{
+    // trim the string
+    const char *trimmed_uri = trim_uri(uri);
+
+    int uri_len = strlen(trimmed_uri);
+    char *handler_uri = malloc(uri_len + 4);
+    // copy it into new memory
+    memcpy(handler_uri, trimmed_uri, uri_len);
+    // add /?* at the end of uri
+    memcpy(handler_uri + uri_len, &"/?*", 4);
+    // release trimmed string
+    free((void *)trimmed_uri);
+
+    // create httpd uri
+    httpd_uri_t uri_config = {
+        .uri = handler_uri,
+        .method = method,
+        .handler = handler,
+        .user_ctx = NULL};
+    // register handler
+    esp_err_t result = httpd_register_uri_handler(server, &uri_config);
+    free(handler_uri);
+    return result;
+}
+
+json_node_t *json_endpoint_init(httpd_handle_t server, const char *base_path)
+{
+    // register handlers in http server
+    register_uri_handler(server, base_path, HTTP_GET, json_httpd_handler);
+    register_uri_handler(server, base_path, HTTP_POST, json_httpd_handler);
 
     json_node_t *root_node = malloc(sizeof(json_node_t));
 
-    int base_path_length = strlen(base_path);
-    // if base_path has *,? or / on the end, then ignore it
-    switch (base_path[base_path_length - 1])
-    {
-    case '*':
-        // if there was question mark before asterisk, ignore it as well
-        if (base_path[base_path_length - 2] == '?')
-            base_path_length -= 1;
-        __attribute__((fallthrough));
-    case '?':
-    case '/':
-        base_path_length -= 1;
-        break;
-    }
+    remove_leading_slash(&base_path);
+    char *uri = trim_uri(base_path);
+    root_node->uri_fragment = uri;
 
-    root_node->uri_fragment = malloc(base_path_length + 1); //acount for \0
-    strncpy(root_node->uri_fragment, base_path, base_path_length);
-    root_node->uri_fragment[base_path_length] = '\0'; // add \0 explicitly
     root_node->endpoint = NULL;
     root_node->parent_node = NULL;
     root_node->child_nodes = NULL;
