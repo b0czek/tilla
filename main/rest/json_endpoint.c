@@ -22,13 +22,13 @@ static cJSON *generate_tree(json_node_t *node)
         cJSON *iterated_tree = generate_tree(iterated_node);
 
         char *tree_name = iterated_node->uri_fragment;
-        // if the node is an endpoint and not just an intermediate node, append * at the end of its name
+        // if the node is an endpoint and not just an intermediate node, append @ at the end of its name
         if (iterated_node->endpoint != NULL)
         {
             int uri_fragment_len = strlen(iterated_node->uri_fragment);
             tree_name = malloc(uri_fragment_len + 2);
             memcpy(tree_name, iterated_node->uri_fragment, uri_fragment_len);
-            memcpy(tree_name + uri_fragment_len, &"*", 2);
+            memcpy(tree_name + uri_fragment_len, &"@", 2);
         }
 
         cJSON_AddItemToObject(nodes, tree_name, iterated_tree);
@@ -72,6 +72,19 @@ static esp_err_t json_httpd_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static json_node_t *find_child_by_uri(json_node_t *parent_node, const char *searched_uri)
+{
+    for (int i = 0; i < parent_node->child_nodes_count; i++)
+    {
+        json_node_t *iterated_child = (parent_node->child_nodes + i);
+        if (strcmp(iterated_child->uri_fragment, searched_uri) == 0)
+        {
+            return iterated_child;
+        }
+    }
+    return NULL;
+}
+
 /**
  * @returns pointer to appended child node in root node
  * 
@@ -89,7 +102,7 @@ static json_node_t *json_child_append(json_node_t *root_node, const json_node_t 
     else
     {
         int children_count = root_node->child_nodes_count;
-        root_node->child_nodes = realloc(root_node->child_nodes, sizeof(json_node_t) * children_count + 1);
+        root_node->child_nodes = realloc(root_node->child_nodes, sizeof(json_node_t) * (children_count + 1));
         memcpy((root_node->child_nodes + children_count), child_node, sizeof(json_node_t));
         appended_node = (root_node->child_nodes + children_count);
     }
@@ -228,6 +241,15 @@ json_node_t *json_endpoint_add(json_node_t *root_node, const char *endpoint_path
     int uri_length = fragment == NULL ? strlen(endpoint_path) + 1 : fragment - endpoint_path + 1;
     char *uri_fragment = malloc(uri_length);
     strlcpy(uri_fragment, endpoint_path, uri_length);
+    // if there is a node with the same uri, then just move to it
+    json_node_t *existing_node = find_child_by_uri(root_node, uri_fragment);
+    if (existing_node != NULL)
+    {
+        json_node_t *appended_node = json_endpoint_add(existing_node, endpoint_path, endpoint);
+
+        free(uri_fragment);
+        return appended_node;
+    }
 
     json_node_t new_node_config = {
         // path is trimmed in process of strtok
