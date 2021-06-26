@@ -4,7 +4,7 @@
 #include "network.h"
 #include "network_tools.h"
 
-cJSON *get_chip_info_json()
+cJSON *get_chip_info_json(httpd_req_t *req)
 {
     cJSON *chip = cJSON_CreateObject();
     esp_chip_info_t *chip_info = malloc(sizeof(esp_chip_info_t));
@@ -23,20 +23,4 @@ cJSON *get_chip_info_json()
     cJSON_AddStringToObject(chip, "chip_id", id);
 
     return chip;
-}
-
-/* Handler for getting device's chip info */
-esp_err_t chip_data_get_handler(httpd_req_t *req)
-{
-
-    httpd_resp_set_type(req, "application/json");
-
-    cJSON *root = get_chip_info_json();
-
-    const char *response = cJSON_PrintUnformatted(root);
-    httpd_resp_sendstr(req, response);
-
-    free((void *)response);
-    cJSON_Delete(root);
-    return ESP_OK;
 }

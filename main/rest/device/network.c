@@ -18,7 +18,7 @@ esp_network_info_t *get_network_info()
     return interfaces_info;
 }
 
-cJSON *get_network_info_json()
+cJSON *get_network_info_json(httpd_req_t *req)
 {
     esp_network_info_t *interfaces_info = get_network_info();
     cJSON *interfaces = cJSON_CreateObject();
@@ -70,18 +70,4 @@ cJSON *get_network_info_json()
     free_esp_network_info(interfaces_info, NETWORK_INTERFACES_COUNT);
     cJSON_AddBoolToObject(interfaces, "error", false);
     return interfaces;
-}
-esp_err_t network_data_get_handler(httpd_req_t *req)
-{
-
-    httpd_resp_set_type(req, "application/json");
-
-    cJSON *root = get_network_info_json();
-
-    const char *response = cJSON_PrintUnformatted(root);
-    httpd_resp_sendstr(req, response);
-
-    free((void *)response);
-    cJSON_Delete(root);
-    return ESP_OK;
 }

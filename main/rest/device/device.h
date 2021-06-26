@@ -5,11 +5,11 @@
 #include "esp_http_server.h"
 
 #include "rest_server.h"
+#include "json_endpoint.h"
 #include "network.h"
 
 // chip functions
-cJSON *get_chip_info_json();
-esp_err_t chip_data_get_handler(httpd_req_t *req);
+cJSON *get_chip_info_json(httpd_req_t *req);
 
 // network
 #if defined(CONFIG_CONNECT_ETHERNET) && defined(CONFIG_CONNECT_WIFI)
@@ -22,13 +22,10 @@ esp_err_t chip_data_get_handler(httpd_req_t *req);
 #endif
 
 esp_network_info_t *get_network_info();
-cJSON *get_network_info_json();
-esp_err_t network_data_get_handler(httpd_req_t *req);
+cJSON *get_network_info_json(httpd_req_t *req);
 
 // stats
-cJSON *get_stats_json();
-esp_err_t stats_data_get_handler(httpd_req_t *req);
+cJSON *get_stats_json(httpd_req_t *req);
 
 // device functions
-esp_err_t device_data_get_handler(httpd_req_t *req);
-esp_err_t register_device_handlers(httpd_handle_t server, rest_server_context_t *ctx);
+esp_err_t register_device_handlers(json_node_t *server);

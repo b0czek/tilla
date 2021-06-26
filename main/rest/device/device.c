@@ -3,52 +3,44 @@
 #include "device.h"
 
 /* Handler for getting all info about device */
-esp_err_t device_data_get_handler(httpd_req_t *req)
+cJSON *device_data_get_json(httpd_req_t *req)
 {
-
-    httpd_resp_set_type(req, "application/json");
-
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddItemToObject(root, "stats", get_stats_json());
-    cJSON_AddItemToObject(root, "interfaces_info", get_network_info_json());
-    cJSON_AddItemToObject(root, "chip_info", get_chip_info_json());
-
-    const char *response = cJSON_Print(root);
-    httpd_resp_sendstr(req, response);
-
-    free((void *)response);
-    cJSON_Delete(root);
-    return ESP_OK;
+    cJSON_AddItemToObject(root, "stats", get_stats_json(req));
+    cJSON_AddItemToObject(root, "interfaces_info", get_network_info_json(req));
+    cJSON_AddItemToObject(root, "chip_info", get_chip_info_json(req));
+    return root;
 }
 
-esp_err_t register_device_handlers(httpd_handle_t server, rest_server_context_t *ctx)
+esp_err_t register_device_handlers(json_node_t *server)
 {
-    httpd_uri_t device_data_get_uri = {
-        .uri = "/api/v1/device/?",
-        .method = HTTP_GET,
-        .handler = device_data_get_handler,
-        .user_ctx = ctx};
-    httpd_register_uri_handler(server, &device_data_get_uri);
+    json_node_endpoint_t device_data_get_uri = {
 
-    httpd_uri_t chip_data_get_uri = {
-        .uri = "/api/v1/device/chip/?",
+        .handler = device_data_get_json,
         .method = HTTP_GET,
-        .handler = chip_data_get_handler,
-        .user_ctx = ctx};
-    httpd_register_uri_handler(server, &chip_data_get_uri);
+    };
+    json_node_t *device = json_endpoint_add(server, "device", &device_data_get_uri);
+    printf("device endpoint: %s\n", device->uri_fragment);
+    json_node_endpoint_t chip_data_get_uri = {
 
-    httpd_uri_t network_data_get_uri = {
-        .uri = "/api/v1/device/network/?",
+        .handler = get_chip_info_json,
         .method = HTTP_GET,
-        .handler = network_data_get_handler,
-        .user_ctx = ctx};
-    httpd_register_uri_handler(server, &network_data_get_uri);
+    };
+    json_endpoint_add(device, "chip", &chip_data_get_uri);
 
-    httpd_uri_t stats_data_get_uri = {
-        .uri = "/api/v1/device/stats/?",
+    json_node_endpoint_t network_data_get_uri = {
+
+        .handler = get_network_info_json,
         .method = HTTP_GET,
-        .handler = stats_data_get_handler,
-        .user_ctx = ctx};
-    httpd_register_uri_handler(server, &stats_data_get_uri);
+    };
+    json_endpoint_add(device, "network", &network_data_get_uri);
+
+    json_node_endpoint_t stats_data_get_uri = {
+
+        .handler = get_stats_json,
+        .method = HTTP_GET,
+    };
+    json_endpoint_add(device, "stats", &stats_data_get_uri);
+
     return ESP_OK;
 }
