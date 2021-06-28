@@ -20,15 +20,29 @@ static cJSON *generate_tree(json_node_t *node)
     {
         json_node_t *iterated_node = (node->child_nodes + i);
         cJSON *iterated_tree = generate_tree(iterated_node);
-
+        // if node is not an endpoint, pointer will stay pointing to path shard
         char *tree_name = iterated_node->uri_fragment;
-        // if the node is an endpoint and not just an intermediate node, append @ at the end of its name
+        // if the node is an endpoint and not just an intermediate node, append @ and method at the end of its name
         if (iterated_node->endpoint != NULL)
         {
+            const char *method = NULL;
+            switch (iterated_node->endpoint->method)
+            {
+            case HTTP_GET:
+                method = &"GET";
+                break;
+            case HTTP_POST:
+                method = &"POST";
+                break;
+            default:
+                method = &"UNKNOWN";
+                break;
+            }
+
             int uri_fragment_len = strlen(iterated_node->uri_fragment);
-            tree_name = malloc(uri_fragment_len + 2);
-            memcpy(tree_name, iterated_node->uri_fragment, uri_fragment_len);
-            memcpy(tree_name + uri_fragment_len, &"@", 2);
+            // path shard + @ + method + \0
+            tree_name = malloc(uri_fragment_len + 2 + strlen(method));
+            sprintf(tree_name, "%s@%s", iterated_node->uri_fragment, method);
         }
 
         cJSON_AddItemToObject(nodes, tree_name, iterated_tree);
@@ -124,8 +138,10 @@ static json_node_t *json_child_append(json_node_t *root_node, const json_node_t 
 json_node_t *json_endpoint_find(json_node_t *root_node, const char *path, httpd_method_t method)
 {
     remove_leading_slash(&path);
+    printf("searching for path %s in node %s\n", path, root_node->uri_fragment);
 
     int node_uri_len = strlen(root_node->uri_fragment);
+    // if searched node does not start with the same prefix
     if (strncmp(path, root_node->uri_fragment, node_uri_len) != 0)
     {
         return NULL;
@@ -154,68 +170,73 @@ json_node_t *json_endpoint_find(json_node_t *root_node, const char *path, httpd_
 
 bool json_endpoint_delete(json_node_t *deleted_node)
 {
-    // dont delete the anything if its root node
+    printf("proceeding with deletion of node %s\n", deleted_node->uri_fragment);
+    // dont delete anything if its root node
     if (deleted_node->parent_node == NULL)
     {
+        printf("not deleting %s cause its root node\n", deleted_node->uri_fragment);
         return false;
     }
     // if its intermediate node, but it has its own endpoint, delete the endpoint
     if (deleted_node->child_nodes_count > 0 && deleted_node->endpoint != NULL)
     {
+        printf("deleting only endpoint since node %s has its children \n", deleted_node->uri_fragment);
         free(deleted_node->endpoint);
         deleted_node->endpoint = NULL;
         return true;
     }
-    // if its intermediate node, dont delete it
-    else if (deleted_node->endpoint == NULL)
+    // if its intermediate node, but it hasnt got its own endpoint, then dont delete the node
+    else if (deleted_node->child_nodes_count > 0)
     {
+        printf("not deleting node %s, because its got children \n", deleted_node->uri_fragment);
         return false;
     }
 
-    // if the node is at the end of the tree, delete it
+    // if the node is at the end of the branch, delete it
 
     // destroy the node's members
-    free(deleted_node->uri_fragment);
-    free(deleted_node->endpoint);
+    printf("deleting node %s\n", deleted_node->uri_fragment);
+    // free(deleted_node->uri_fragment);
+    // free(deleted_node->endpoint);
 
     int parents_children_count = deleted_node->parent_node->child_nodes_count;
     // search for deleted node reference in parents children array and remove it
     for (int i = 0; i < parents_children_count; i++)
     {
         json_node_t *iterated_node = (deleted_node->parent_node->child_nodes + i);
-        // if iterated node is the deleted one
-        if (iterated_node == deleted_node)
+        if (iterated_node != deleted_node)
         {
-            // if child node is not the last one, shift all other members
-            if ((i + 1) != parents_children_count)
-            {
-                int children_to_move = parents_children_count - (i + 1);
-                memmove(iterated_node, (iterated_node + 1), sizeof(json_node_t) * children_to_move);
-            }
-            // realloc and free removes the node to be deleted
-            // if parent has more than 1 child, reallocate their memory
-            if (parents_children_count > 1)
-            {
-                // reallocate memory with 1 children less
-                realloc(deleted_node->parent_node->child_nodes, sizeof(json_node_t) * parents_children_count);
-            }
-            // if parent has 1 child, free whole memory
-            else
-            {
-                free(deleted_node->parent_node->child_nodes);
-                deleted_node->parent_node->child_nodes = NULL;
-            }
-
-            // decrement children count
-            deleted_node->parent_node->child_nodes_count--;
-            break;
+            continue;
         }
+        // if iterated node is the deleted one
+
+        // if child node is not the last one, shift all other members
+        if ((i + 1) != parents_children_count)
+        {
+            int children_to_move = parents_children_count - (i + 1);
+            memmove(iterated_node, (iterated_node + 1), sizeof(json_node_t) * children_to_move);
+        }
+        // realloc and free removes the node to be deleted
+        // if parent has more than 1 child, reallocate their memory
+        if (parents_children_count > 1)
+        {
+            // reallocate memory with 1 children less
+            realloc(deleted_node->parent_node->child_nodes, sizeof(json_node_t) * (parents_children_count - 1));
+        }
+        // if parent has 1 child, free whole memory
+        else
+        {
+            free(deleted_node->parent_node->child_nodes);
+            deleted_node->parent_node->child_nodes = NULL;
+        }
+
+        // decrement children count
+        deleted_node->parent_node->child_nodes_count--;
+        break;
     }
 
-    // if deleted node is the only child and the parent node is not an endpoint itself
-    // then delete parent node as well
-    if (deleted_node->parent_node->child_nodes_count == 1 &&
-        deleted_node->parent_node->endpoint == NULL)
+    // try to delete parent if it isnt an endpoint
+    if (deleted_node->parent_node->endpoint == NULL)
     {
         json_endpoint_delete(deleted_node->parent_node);
     }
@@ -224,51 +245,52 @@ bool json_endpoint_delete(json_node_t *deleted_node)
 
 json_node_t *json_endpoint_add(json_node_t *root_node, const char *endpoint_path, json_node_endpoint_t *endpoint)
 {
+    // printf("adding node %s to node %s\n", endpoint_path, root_node->uri_fragment);
+
     remove_leading_slash(&endpoint_path);
 
-    // check if endpoint path starts with root's uri
+    // check if node uri starts with root's uri
     if (strncmp(endpoint_path, root_node->uri_fragment, strlen(root_node->uri_fragment)) == 0)
     {
-        // offset path pointer
+        // if so, offset path pointer
         endpoint_path += strlen(root_node->uri_fragment);
     }
 
     remove_leading_slash(&endpoint_path);
 
+    // search for node delimiter in uri
     char *fragment = strstr(endpoint_path, "/");
 
     // if there is a slash, copy the trimmed fragment, if not, copy whole stirng
     int uri_length = fragment == NULL ? strlen(endpoint_path) + 1 : fragment - endpoint_path + 1;
     char *uri_fragment = malloc(uri_length);
     strlcpy(uri_fragment, endpoint_path, uri_length);
-    // if there is a node with the same uri, then just move to it
-    json_node_t *existing_node = find_child_by_uri(root_node, uri_fragment);
-    if (existing_node != NULL)
+
+    // search for node with the same uri fragment in root
+    json_node_t *operating_node = find_child_by_uri(root_node, uri_fragment);
+
+    // if there is no node with the same uri, append new node
+    if (operating_node == NULL)
     {
-        json_node_t *appended_node = json_endpoint_add(existing_node, endpoint_path, endpoint);
+        printf("no node %s found in %s, appending new node %s \n", endpoint_path, root_node->uri_fragment, uri_fragment);
+        json_node_t new_node_config = {
+            // path is trimmed in process of substringing
+            .uri_fragment = uri_fragment,
+            // if there is not path to split anymore, add the endpoint config
+            .endpoint = fragment == NULL ? endpoint : NULL,
+            .parent_node = root_node,
+            .child_nodes = NULL,
+            .child_nodes_count = 0};
 
+        operating_node = json_child_append(root_node, &new_node_config);
         free(uri_fragment);
-        return appended_node;
     }
-
-    json_node_t new_node_config = {
-        // path is trimmed in process of strtok
-        .uri_fragment = uri_fragment,
-        // if there is not path to split anymore, add the endpoint config
-        .endpoint = fragment == NULL ? endpoint : NULL,
-        .parent_node = root_node,
-        .child_nodes = NULL,
-        .child_nodes_count = 0};
-
-    json_node_t *appended_node = json_child_append(root_node, &new_node_config);
-    free(uri_fragment);
-
+    // if there is another section('/') in requsted path
     if (fragment != NULL)
     {
-        json_endpoint_add(appended_node, endpoint_path, endpoint);
+        operating_node = json_endpoint_add(operating_node, endpoint_path, endpoint);
     }
-
-    return appended_node;
+    return operating_node;
 }
 
 static char *trim_uri(const char *uri)
