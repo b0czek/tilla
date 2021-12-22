@@ -6,6 +6,8 @@
 #include "network_tools.h"
 #include "network_info.h"
 
+#define FIELD_SIZEOF(t, f) (sizeof(((t *)0)->f))
+
 esp_network_info_t *get_network_info()
 {
     esp_network_info_t *interfaces_info = malloc(NETWORK_INTERFACES_COUNT * sizeof(esp_network_info_t));
@@ -22,11 +24,6 @@ cJSON *get_network_info_json(httpd_req_t *req)
 {
     esp_network_info_t *interfaces_info = get_network_info();
     cJSON *interfaces = cJSON_CreateObject();
-    if (interfaces_info == NULL)
-    {
-        cJSON_AddBoolToObject(interfaces, "error", false);
-        return interfaces;
-    }
     for (int i = 0; i < NETWORK_INTERFACES_COUNT; i++)
     {
         esp_network_info_t *netif = interfaces_info + i;
@@ -60,7 +57,14 @@ cJSON *get_network_info_json(httpd_req_t *req)
                 cJSON_AddStringToObject(wifi_info, "ssid", (char *)netif->wifi_info->ssid);
                 cJSON_AddNumberToObject(wifi_info, "rssi", netif->wifi_info->rssi);
                 cJSON_AddNumberToObject(wifi_info, "auth_mode", (int)netif->wifi_info->authmode);
-                cJSON_AddStringToObject(wifi_info, "country_code", netif->wifi_info->country.cc);
+
+                // country code seems to not be null terminated for some reason
+                int cc_size = FIELD_SIZEOF(wifi_country_t, cc);
+                char *cc = malloc(cc_size * sizeof(char));
+                strncpy(cc, netif->wifi_info->country.cc, cc_size);
+                cc[cc_size - 1] = '\0';
+                cJSON_AddStringToObject(wifi_info, "country_code", cc);
+                free(cc);
             }
             cJSON_AddItemToObject(interface, "wifi_info", wifi_info);
         }
