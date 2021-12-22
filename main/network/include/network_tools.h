@@ -5,7 +5,7 @@
 
 /**
  * @brief Checks the netif description if it contains specified prefix.
- * All netifs created withing common connect component are prefixed with the module TAG,
+ * All netifs created withing common connect component are prefixed with the module NETWORK_TAG,
  * so it returns true if the specified netif is owned by this module
  */
 bool is_our_netif(const char *prefix, esp_netif_t *netif);

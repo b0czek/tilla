@@ -8,7 +8,7 @@ extern "C"
 #include "esp_err.h"
 #include "esp_netif.h"
 
-   const char *TAG;
+   const char *NETWORK_TAG;
 
 #define member_size(type, member) sizeof(((type *)0)->member) // cast nullpointer to struct and get member size
 #define MAC_BYTES 6

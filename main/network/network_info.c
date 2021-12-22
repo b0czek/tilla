@@ -18,7 +18,7 @@ esp_err_t get_esp_network_info(esp_network_info_t *dest, size_t dest_len)
     for (int i = 0; i < esp_netif_get_nr_of_ifs(); ++i)
     {
         netif = esp_netif_next(netif);
-        if (!is_our_netif(TAG, netif)) // skip if interface is not "our" somehow
+        if (!is_our_netif(NETWORK_TAG, netif)) // skip if interface is not "our" somehow
         {
             continue;
         }

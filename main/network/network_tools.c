@@ -44,7 +44,7 @@ esp_err_t set_static_ip(esp_netif_t *netif, esp_ip4_info_t *ip_config)
     {
         *(&ipconfig.ip + i) = ip4_aton((&ip_config->ip + i)[0]).ip4_addr;
     }
-    ESP_LOGI(TAG, "Setting static ip for %s - ip: %s, netmask: %s, gateway: %s",
+    ESP_LOGI(NETWORK_TAG, "Setting static ip for %s - ip: %s, netmask: %s, gateway: %s",
              get_interface_short_name(netif), ip_config->ip, ip_config->netmask, ip_config->gw);
     return esp_netif_set_ip_info(netif, &ipconfig);
 }
@@ -59,11 +59,11 @@ esp_err_t set_static_dns(esp_netif_t *netif, esp_dns_info_t *dns_config)
         esp_err_t result = esp_netif_set_dns_info(netif, i, &config);
         if (result != ESP_OK)
         {
-            ESP_LOGI(TAG, "Something went wrong when setting static DNS for %s", get_interface_short_name(netif));
+            ESP_LOGI(NETWORK_TAG, "Something went wrong when setting static DNS for %s", get_interface_short_name(netif));
             return result;
         }
     }
-    ESP_LOGI(TAG, "Setting static DNS for %s - %s and %s", get_interface_short_name(netif), dns_config->main, dns_config->backup);
+    ESP_LOGI(NETWORK_TAG, "Setting static DNS for %s - %s and %s", get_interface_short_name(netif), dns_config->main, dns_config->backup);
     return ESP_OK;
 }
 #endif
