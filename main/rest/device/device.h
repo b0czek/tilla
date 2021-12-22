@@ -5,8 +5,8 @@
 #include "esp_http_server.h"
 
 #include "rest_server.h"
-#include "json_endpoint.h"
 #include "network.h"
+#include "../rest_utils.h"
 
 // chip functions
 cJSON *get_chip_info_json(httpd_req_t *req);
@@ -28,4 +28,4 @@ cJSON *get_network_info_json(httpd_req_t *req);
 cJSON *get_stats_json(httpd_req_t *req);
 
 // device functions
-esp_err_t register_device_handlers(json_node_t *server);
+esp_err_t register_device_handlers(httpd_handle_t *server, rest_server_context_t *rest_context);

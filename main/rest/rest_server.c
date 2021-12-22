@@ -6,7 +6,6 @@
 
 #include "rest_server.h"
 #include "device.h"
-#include "json_endpoint.h"
 
 static const char *REST_TAG = "esp-rest";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -68,15 +67,8 @@ esp_err_t start_rest_server(const char *base_path)
     ESP_LOGI(REST_TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
 
-    json_node_t *json_endpoint = json_endpoint_init(server, "/api/v1/?*");
-
-    /* URI handlers for fetching data about device vitals */
-    register_device_handlers(json_endpoint);
-
-    json_node_endpoint_t device_endpoint = {
-        .handler = get_routing_tree_json,
-        .method = HTTP_GET};
-    json_endpoint_add(json_endpoint, "routing_tree", &device_endpoint);
+    // /* URI handlers for fetching data about device vitals */
+    register_device_handlers(&server, rest_context);
 
     /* URI handler for fetching temperature data */
     httpd_uri_t temperature_data_get_uri = {
@@ -86,12 +78,13 @@ esp_err_t start_rest_server(const char *base_path)
         .user_ctx = rest_context};
     httpd_register_uri_handler(server, &temperature_data_get_uri);
 
-    httpd_uri_t reset_device_uri = {
-        .uri = "/api/v1/reset",
+    /* URI handler for fetching device restart */
+    httpd_uri_t device_restart_uri = {
+        .uri = "/api/v1/restart",
         .method = HTTP_GET,
         .handler = device_restart_handler,
         .user_ctx = rest_context};
-    httpd_register_uri_handler(server, &reset_device_uri);
+    httpd_register_uri_handler(server, &device_restart_uri);
 
     return ESP_OK;
 err_start:
