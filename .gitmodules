@@ -10,3 +10,6 @@
 [submodule "vec_lib"]
 	path = components/vec/vec
 	url = git@github.com:rxi/vec.git
+[submodule "components/bme280/driver"]
+	path = components/bme280/driver
+	url = git@github.com:BoschSensortec/BME280_driver.git

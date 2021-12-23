@@ -10,6 +10,8 @@
 #include "rest_server.h"
 #include "fs.h"
 
+#include "bme280_driver.h"
+
 #define MDNS_INSTANCE "esp home web server"
 
 static void initialise_mdns(void)
@@ -38,4 +40,5 @@ void app_main(void)
 
     ESP_ERROR_CHECK(network_connect());
     ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
+    bme280_driver_init();
 }
