@@ -28,4 +28,4 @@ cJSON *get_network_info_json(httpd_req_t *req);
 cJSON *get_stats_json(httpd_req_t *req);
 
 // device functions
-esp_err_t register_device_handlers(httpd_handle_t *server, rest_server_context_t *rest_context);
+esp_err_t register_device_handlers(httpd_handle_t *server);

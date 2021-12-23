@@ -1,19 +1,14 @@
 #include "sdkconfig.h"
-#include "driver/gpio.h"
-#include "sdmmc_cmd.h"
 #include "mdns.h"
 #include "lwip/apps/netbiosns.h"
 
-#include "esp_vfs_semihost.h"
-#include "esp_vfs_fat.h"
-#include "esp_spiffs.h"
 #include "nvs_flash.h"
-#include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_log.h"
 
 #include "network.h"
 #include "rest_server.h"
+#include "fs.h"
 
 #define MDNS_INSTANCE "esp home web server"
 
@@ -28,13 +23,14 @@ static void initialise_mdns(void)
         {"board", "esp32"},
         {"path", "/"}};
 
-    ESP_ERROR_CHECK(mdns_service_add("ESP32-WebServer", "_http", "_tcp", 80, serviceTxtData,
+    ESP_ERROR_CHECK(mdns_service_add(CONFIG_MDNS_HOST_NAME, "_http", "_tcp", 80, serviceTxtData,
                                      sizeof(serviceTxtData) / sizeof(serviceTxtData[0])));
 }
 
 void app_main(void)
 {
     ESP_ERROR_CHECK(nvs_flash_init());
+    // ESP_ERROR_CHECK(init_fs());
     ESP_ERROR_CHECK(esp_netif_init());                // initialize tcp/ip stack
     ESP_ERROR_CHECK(esp_event_loop_create_default()); // create an event loop
     initialise_mdns();
