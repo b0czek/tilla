@@ -12,7 +12,6 @@
 
 #define MDNS_INSTANCE "esp home web server"
 
-void start_reading_sensors();
 static void initialise_mdns(void)
 {
     mdns_init();
@@ -39,5 +38,4 @@ void app_main(void)
 
     ESP_ERROR_CHECK(network_connect());
     ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
-    start_reading_sensors();
 }
