@@ -8,6 +8,8 @@
 #include "device.h"
 #include "ds18b20_driver.h"
 #include "ds18b20_rest.h"
+#include "bme280_driver.h"
+#include "bme280_rest.h"
 
 static const char *REST_TAG = "esp-rest";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -60,7 +62,7 @@ esp_err_t start_rest_server(const char *base_path)
         .method = HTTP_GET,
         .handler = device_restart_handler};
     httpd_register_uri_handler(server, &device_restart_uri);
-
+    // * DS18B20
     ds18b20_config_t ds18b20_config = {
         .reading_interval = 1000,
         .gpio = 4,
@@ -70,6 +72,28 @@ esp_err_t start_rest_server(const char *base_path)
 
     ds18b20_driver_init(data, &ds18b20_config);
     register_ds18b20_handlers(&server, data);
+    // * DS18B20
+
+    // * BME280
+    i2c_config_t i2c_config = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = 5,
+        .scl_io_num = 16,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = 1000000};
+    i2c_init(&i2c_config, I2C_NUM_0);
+
+    i2c_search_devices(I2C_NUM_0);
+    bme280_dev_config_t dev_configs[] = {
+        {.addr = 0x76,
+         .i2c_port = I2C_NUM_0},
+        {.addr = 0x77,
+         .i2c_port = I2C_NUM_0},
+    };
+    bme280_driver_t *bme280_driver = bme280_driver_init(1000, dev_configs, sizeof(dev_configs) / sizeof(bme280_dev_config_t));
+    register_bme280_handlers(&server, bme280_driver);
+    // * BME280
 
     return ESP_OK;
 err_start:
