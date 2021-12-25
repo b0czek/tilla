@@ -34,7 +34,7 @@ static void vTaskReadDevices(void *data)
         {
             ds18b20_device_t *device = (ds_data->devices.data + i);
             device->error = ds18b20_read_temp(device->device, &device->reading);
-            printf("sensor %d, error: %d, value: %f\n", i, device->error, device->reading);
+            // printf("sensor %d, error: %d, value: %f\n", i, device->error, device->reading);
         }
 
         vTaskDelayUntil(&last_wake_time, ds_data->config->reading_interval / portTICK_PERIOD_MS);
@@ -128,7 +128,7 @@ esp_err_t ds18b20_driver_init(ds18b20_data_t *data, ds18b20_config_t *config)
 
     if (num_devices > 0)
     {
-        xTaskCreate(vTaskReadDevices, "DS18B20 Read", STACK_SIZE, data, tskIDLE_PRIORITY + 2, &data->xHandle);
+        xTaskCreate(vTaskReadDevices, "ds18b20_read", STACK_SIZE, data, tskIDLE_PRIORITY + 2, &data->xHandle);
     }
 
     return ESP_OK;

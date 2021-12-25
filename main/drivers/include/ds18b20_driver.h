@@ -3,6 +3,8 @@
 #include <ds18b20.h>
 #include <owb.h>
 #include <vec.h>
+#include <freertos/task.h>
+#include <esp_err.h>
 
 #define STACK_SIZE 2048
 
