@@ -9,8 +9,11 @@
 #include "network.h"
 #include "rest_server.h"
 #include "fs.h"
+#include "drivers.h"
 
-#include "bme280_driver.h"
+#ifdef CONFIG_USE_DISPLAY
+#include "display.h"
+#endif
 
 #define MDNS_INSTANCE "esp home web server"
 
@@ -38,7 +41,11 @@ void app_main(void)
     netbiosns_init();
     netbiosns_set_name(CONFIG_MDNS_HOST_NAME);
 
+    sensor_drivers_t *drivers = init_drivers();
+
+#ifdef CONFIG_USE_DISPLAY
+    init_display(drivers);
+#endif
     ESP_ERROR_CHECK(network_connect());
-    ESP_ERROR_CHECK(start_rest_server(CONFIG_WEB_MOUNT_POINT));
-    bme280_driver_init();
+    ESP_ERROR_CHECK(start_rest_server(drivers));
 }

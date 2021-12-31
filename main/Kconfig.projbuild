@@ -1,26 +1,33 @@
-menu "RESTful Server Configuration"
+menu "REST Server Configuration"
 
     config MDNS_HOST_NAME
         string "mDNS Host Name"
-        default "esp-home"
+        default "tilla-node"
         help
             Specify the domain name used in the mDNS service.
             Note that webpage also take it as a part of URL where it will send GET/POST requests to.
-
-    if WEB_DEPLOY_SEMIHOST
-        config HOST_PATH_TO_MOUNT
-            string "Host path to mount (e.g. absolute path to web dist directory)"
-            default "PATH-TO-WEB-DIST_DIR"
-            help
-                When using semihost in ESP32, you should specify the host path which will be mounted to VFS.
-                Note that only absolute path is acceptable.
-    endif
-
     config WEB_MOUNT_POINT
         string "Website mount point in VFS"
         default "/www"
         help
             Specify the mount point in VFS.
-            Honestly I'd like to remove it.
+
+endmenu
+menu "Display config"
+    config USE_DISPLAY
+        bool "use display"
+        default n
+    if USE_DISPLAY    
+        config LV_USE_THEME_MATERIAL
+            bool "Use material theme"
+            default y
+        config LV_HOR_RES_MAX
+            int "Maximal horizontal resolution to support by the library."
+            default 240
+
+        config LV_VER_RES_MAX
+            int "Maximal vertical resolution to support by the library."
+            default 320
+    endif
 
 endmenu
