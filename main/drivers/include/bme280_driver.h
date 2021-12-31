@@ -1,6 +1,7 @@
 #pragma once
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <freertos/semphr.h>
 
 #include <esp_err.h>
 #include <bme280.h>
@@ -34,7 +35,7 @@ typedef struct
     int8_t error;
     uint32_t reading_interval;
     TaskHandle_t xHandle;
-
+    SemaphoreHandle_t xSemaphore;
 } bme280_driver_t;
 
 void i2c_init(i2c_config_t *config, i2c_port_t i2c_num);

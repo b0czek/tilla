@@ -2,12 +2,19 @@
 #include "bme280_rest.h"
 #include <stdlib.h>
 #include <stdio.h>
-
+#include <freertos/semphr.h>
 cJSON *sensor_data_bme280(httpd_req_t *req)
 {
     bme280_driver_t *driver = (bme280_driver_t *)req->user_ctx;
 
     cJSON *root = cJSON_CreateObject();
+
+    if (xSemaphoreTake(driver->xSemaphore, portMAX_DELAY) != pdTRUE)
+    {
+        cJSON_AddBoolToObject(root, "error", true);
+        return root;
+    }
+
     cJSON_AddNumberToObject(root, "error", driver->error);
     cJSON *sensors_data = cJSON_CreateObject();
     for (int i = 0; i < driver->sensors.length; i++)
@@ -26,10 +33,12 @@ cJSON *sensor_data_bme280(httpd_req_t *req)
     }
 
     cJSON_AddItemToObject(root, "sensors", sensors_data);
+
+    xSemaphoreGive(driver->xSemaphore);
     return root;
 }
 
-json_handler(handle_bme280_data, sensor_data_bme280);
+json_handler_auth(handle_bme280_data, sensor_data_bme280);
 
 esp_err_t register_bme280_handlers(httpd_handle_t *server, bme280_driver_t *driver)
 {

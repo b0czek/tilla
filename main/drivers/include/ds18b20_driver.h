@@ -4,6 +4,8 @@
 #include <owb.h>
 #include <vec.h>
 #include <freertos/task.h>
+#include <freertos/semphr.h>
+
 #include <esp_err.h>
 
 #define STACK_SIZE 2048
@@ -32,6 +34,7 @@ typedef struct
     ds18b20_devices_t devices;
     ds18b20_config_t *config;
     TaskHandle_t xHandle;
+    SemaphoreHandle_t xSemaphore;
     bool error;
 
 } ds18b20_data_t;

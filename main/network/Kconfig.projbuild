@@ -256,7 +256,7 @@ menu "Connection Configuration"
 
     config CONNECT_IPV6
         bool "Obtain IPv6 address"
-        default y
+        default n
         help
             By default, program will wait until IPv4 and IPv6 local link addresses are obtained.
             Disable this option if the network does not support IPv6.

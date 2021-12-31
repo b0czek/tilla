@@ -1,8 +1,13 @@
 #include "ds18b20_driver.h"
 #include <esp_err.h>
+#include <esp_log.h>
+
 #include <stdlib.h>
 #include <string.h>
 #include <freertos/task.h>
+#include <freertos/semphr.h>
+
+#define DRIVER_TAG "ds18b20_driver"
 
 #define DATA_CALLOC_CHECK(data_ptr, ref) \
     if (ref == NULL)                     \
@@ -21,7 +26,7 @@ static int vec_push_check(int r, int x)
 
 static void vTaskReadDevices(void *data)
 {
-    ds18b20_data_t *ds_data = data;
+    ds18b20_data_t *ds_data = (ds18b20_data_t *)data;
     TickType_t last_wake_time = xTaskGetTickCount();
 
     for (;;)
@@ -36,7 +41,7 @@ static void vTaskReadDevices(void *data)
             device->error = ds18b20_read_temp(device->device, &device->reading);
             // printf("sensor %d, error: %d, value: %f\n", i, device->error, device->reading);
         }
-
+        xSemaphoreGive(ds_data->xSemaphore);
         vTaskDelayUntil(&last_wake_time, ds_data->config->reading_interval / portTICK_PERIOD_MS);
     }
 }
@@ -69,6 +74,7 @@ esp_err_t ds18b20_driver_free(ds18b20_data_t *data)
 
 esp_err_t ds18b20_driver_init(ds18b20_data_t *data, ds18b20_config_t *config)
 {
+    ESP_LOGI(DRIVER_TAG, "Initializing DS18B20 driver");
     data->error = true;
 
     // copy config
@@ -88,6 +94,7 @@ esp_err_t ds18b20_driver_init(ds18b20_data_t *data, ds18b20_config_t *config)
     bool found = false;
     owb_search_first(data->owb, &search_state, &found);
 
+    ESP_LOGI(DRIVER_TAG, "Searching for devices");
     while (found)
     {
 
@@ -106,23 +113,26 @@ esp_err_t ds18b20_driver_init(ds18b20_data_t *data, ds18b20_config_t *config)
 
         char rom_code_s[17];
         owb_string_from_rom_code((data->devices.data + num_devices)->device->rom_code, rom_code_s, sizeof(rom_code_s));
-        printf("  %d : 0x%s\n", num_devices, rom_code_s);
+        ESP_LOGI(DRIVER_TAG, "Found a device with rom code: 0x%s", rom_code_s);
 
         ++num_devices;
         owb_search_next(data->owb, &search_state, &found);
     }
-    printf("num of devices: %d\n", num_devices);
+    ESP_LOGI(DRIVER_TAG, "Found %d devices in total ", num_devices);
     // Check for parasitic-powered devices
     bool parasitic_power = false;
     ds18b20_check_for_parasite_power(data->owb, &parasitic_power);
     if (parasitic_power)
     {
-        printf("Parasitic-powered devices detected");
+        ESP_LOGI(DRIVER_TAG, "Parasitic-powered devices detected ");
     }
 
     // In parasitic-power mode, devices cannot indicate when conversions are complete,
     // so waiting for a temperature conversion must be done by waiting a prescribed duration
     owb_use_parasitic_power(data->owb, parasitic_power);
+
+    // create semaphore
+    data->xSemaphore = xSemaphoreCreateMutex();
 
     data->error = false;
 

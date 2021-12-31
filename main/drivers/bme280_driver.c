@@ -9,6 +9,8 @@
 
 #include <esp_err.h>
 
+#define DRIVER_TAG "bme280_driver"
+
 static int vec_push_check(int r, int x)
 {
     return r;
@@ -23,7 +25,7 @@ void i2c_init(i2c_config_t *config, i2c_port_t i2c_num)
 
 void i2c_search_devices(i2c_port_t i2c_num)
 {
-    printf("i2c scan bus %d: \n", i2c_num);
+    ESP_LOGI(DRIVER_TAG, "i2c scan bus %d: ", i2c_num);
 
     for (uint8_t i = 1; i < 127; i++)
     {
@@ -37,7 +39,7 @@ void i2c_search_devices(i2c_port_t i2c_num)
 
         if (ret == ESP_OK)
         {
-            printf("Found device at: 0x%2x\n", i);
+            ESP_LOGI(DRIVER_TAG, "Found device at: 0x%2x", i);
         }
     }
 }
@@ -58,9 +60,9 @@ static int8_t bme280_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32
     i2c_cmd_link_delete(cmd);
 
     // without this print statement it does not work for some reason, i guess it's timing issue???
-    printf("write on %d bus, address 0x%.2x - result %d\n", dev_config->i2c_port, dev_config->addr, res);
+    printf("%d", res);
 
-    return res == 0 ? BME280_OK : BME280_E_COMM_FAIL;
+    return res;
 }
 
 static int8_t bme280_i2c_read(const uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
@@ -85,9 +87,14 @@ static int8_t bme280_i2c_read(const uint8_t reg_addr, uint8_t *reg_data, uint32_
 
     esp_err_t res = i2c_master_cmd_begin(dev_config->i2c_port, cmd, 10 / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
-    printf("read on %d bus, address 0x%.2x - result %d\n", dev_config->i2c_port, dev_config->addr, res);
-
-    return res == 0 ? BME280_OK : BME280_E_COMM_FAIL;
+    printf("%d", res);
+    // ESP_LOGE(DRIVER_TAG, "read on %d bus, address 0x%.2x - result %d\n", dev_config->i2c_port, dev_config->addr, res);
+    // if (res != ESP_OK)
+    // {
+    // ESP_LOGE(DRIVER_TAG, "I2C READ RESULTED IN %d", res);
+    // }
+    // return res == 0 ? BME280_OK : BME280_E_COMM_FAIL;
+    return res;
 }
 
 void delay_us(uint32_t period, void *intf_ptr)
@@ -106,18 +113,18 @@ static void task_bme280_normal_mode(void *sensor_ptr)
 {
     bme280_driver_t *driver = (bme280_driver_t *)sensor_ptr;
 
-    printf("sensors count: %d\n", driver->sensors.length);
-    printf("Temperature, Pressure, Humidity\n");
+    ESP_LOGI(DRIVER_TAG, "bme280 sensors count: %d", driver->sensors.length);
     for (;;)
     {
-        delay_us(driver->reading_interval * 1000, NULL);
         for (int i = 0; i < driver->sensors.length; i++)
         {
             bme280_sensor_t *sensor = (driver->sensors.data) + i;
 
             sensor->error = bme280_get_sensor_data(BME280_ALL, &(sensor->data), &(sensor->dev));
-            print_sensor_data(sensor);
+            // print_sensor_data(sensor);
         }
+        xSemaphoreGive(driver->xSemaphore);
+        delay_us(driver->reading_interval * 1000, NULL);
     }
 }
 
@@ -132,6 +139,7 @@ int8_t bme280_device_init(bme280_sensor_t *sensor)
     sensor->dev.delay_us = delay_us;
 
     result += bme280_init(&(sensor->dev));
+    ESP_LOGI(DRIVER_TAG, "initialization of bme280 sensor |%.2x@%d| resulted in code %d", sensor->config.addr, sensor->config.i2c_port, result);
 
     sensor->dev.settings.osr_h = BME280_OVERSAMPLING_1X;
     sensor->dev.settings.osr_p = BME280_OVERSAMPLING_16X;
@@ -145,7 +153,7 @@ int8_t bme280_device_init(bme280_sensor_t *sensor)
                        BME280_STANDBY_SEL;
     result += bme280_set_sensor_settings(sensor->settings, &(sensor->dev));
     result += bme280_set_sensor_mode(BME280_NORMAL_MODE, &(sensor->dev));
-    printf(" bme280 init result: %d\n", result);
+
     return result;
 }
 
@@ -164,6 +172,8 @@ bme280_driver_t *bme280_driver_init(uint32_t reading_interval, bme280_dev_config
 
         sensor.error = bme280_device_init(driver->sensors.data + i);
     }
+
+    driver->xSemaphore = xSemaphoreCreateMutex();
 
     xTaskCreate(task_bme280_normal_mode, "bme280_normal_mode", 2048, driver, tskIDLE_PRIORITY + 2, &driver->xHandle);
     return driver;

@@ -1,9 +1,15 @@
 #include "ds18b20_rest.h"
-
+#include <freertos/semphr.h>
 cJSON *sensors_data_ds18b20(httpd_req_t *req)
 {
     cJSON *root = cJSON_CreateObject();
     ds18b20_data_t *data = (ds18b20_data_t *)req->user_ctx;
+
+    if (xSemaphoreTake(data->xSemaphore, portMAX_DELAY) != pdTRUE)
+    {
+        cJSON_AddBoolToObject(root, "error", true);
+        return root;
+    }
 
     cJSON_AddBoolToObject(root, "error", data->error);
     cJSON *sensors = cJSON_CreateObject();
@@ -21,11 +27,11 @@ cJSON *sensors_data_ds18b20(httpd_req_t *req)
         free(id);
     }
     cJSON_AddItemToObject(root, "sensors", sensors);
-
+    xSemaphoreGive(data->xSemaphore);
     return root;
 }
 
-json_handler(handle_ds18b20_data, sensors_data_ds18b20);
+json_handler_auth(handle_ds18b20_data, sensors_data_ds18b20);
 
 cJSON *config_data_ds18b20(httpd_req_t *req)
 {
