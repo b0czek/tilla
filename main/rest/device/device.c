@@ -12,10 +12,10 @@ cJSON *device_data_get_json(httpd_req_t *req)
     return root;
 }
 
-json_handler(handle_device_info, device_data_get_json);
-json_handler(handle_chip_info, get_chip_info_json);
-json_handler(handle_network_info, get_network_info_json);
-json_handler(handle_stats_info, get_stats_json);
+json_handler_auth(handle_device_info, device_data_get_json);
+json_handler_auth(handle_chip_info, get_chip_info_json);
+json_handler_auth(handle_network_info, get_network_info_json);
+json_handler_auth(handle_stats_info, get_stats_json);
 
 esp_err_t register_device_handlers(httpd_handle_t *server)
 {

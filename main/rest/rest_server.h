@@ -1,5 +1,5 @@
 #pragma once
-
+#include "drivers.h"
 // #include <esp_vfs.h>
 
 // #define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
@@ -11,4 +11,4 @@
 //     char scratch[SCRATCH_BUFSIZE];
 // } rest_server_context_t;
 
-esp_err_t start_rest_server(const char *base_path);
+esp_err_t start_rest_server(sensor_drivers_t *sensors);

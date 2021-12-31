@@ -1,0 +1,28 @@
+menu "Sensor drivers configuration"
+    menu "DS18B20"
+        config DS18B20_ENABLED
+            bool "Use DS18B20 sensors"
+            default n
+        if DS18B20_ENABLED
+            config DS18B20_READING_INTERVAL
+                int "DS18B20 reading interval"
+                default 1000
+            config DS18B20_GPIO
+                int "DS18B20 GPIO number"
+                range 0 34
+                default 4
+            config DS18B20_RESOLUTION
+                int "DS18B20 resolution"
+                range 9 12
+                default 12
+        endif
+    endmenu
+    
+    menu "BME280"
+        config BME280_ENABLED
+            bool "Use BME280 sensors"
+            default n
+    endmenu
+
+
+endmenu
