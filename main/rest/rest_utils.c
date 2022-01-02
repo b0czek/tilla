@@ -84,10 +84,17 @@ esp_err_t common_handler(httpd_req_t *req, cJSON *(fn)(httpd_req_t *))
     cJSON *response = fn(req);
     if (response)
     {
-        const char *response_string = cJSON_PrintUnformatted(response);
-        httpd_resp_sendstr(req, response_string);
-        free((void *)response_string);
-        cJSON_Delete(response);
+        return respond_json(req, response);
     }
     return ESP_OK;
+}
+
+esp_err_t respond_json(httpd_req_t *req, cJSON *res)
+{
+    const char *response_string = cJSON_PrintUnformatted(res);
+    esp_err_t result = httpd_resp_sendstr(req, response_string);
+    free((void *)response_string);
+    cJSON_Delete(res);
+
+    return result;
 }

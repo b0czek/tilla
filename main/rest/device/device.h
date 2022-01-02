@@ -27,5 +27,8 @@ cJSON *get_network_info_json(httpd_req_t *req);
 // stats
 cJSON *get_stats_json(httpd_req_t *req);
 
+// restart
+cJSON *device_restart(httpd_req_t *req);
+
 // device functions
-esp_err_t register_device_handlers(httpd_handle_t *server);
+esp_err_t register_device_handlers(httpd_handle_t server);
