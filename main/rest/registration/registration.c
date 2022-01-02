@@ -12,7 +12,7 @@ cJSON *registration_info(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "auth_key_len", AUTH_KEY_LENGTH);
     return root;
 }
-json_handler_auth_if_registered(handle_registration_info, registration_info);
+json_handler(handle_registration_info, registration_info);
 
 cJSON *register_device(httpd_req_t *req)
 {
@@ -90,13 +90,14 @@ cJSON *unregister_device(httpd_req_t *req)
 }
 json_handler_auth(handle_unregistration, unregister_device);
 
-esp_err_t register_registration_handlers(httpd_handle_t *server)
+esp_err_t register_registration_handlers(httpd_handle_t server)
 {
+    esp_err_t result = 0;
     httpd_uri_t registration_info_uri = {
         .uri = "/api/v1/registration/info/?",
         .method = HTTP_GET,
         .handler = handle_registration_info};
-    httpd_register_uri_handler(*server, &registration_info_uri);
+    result += httpd_register_uri_handler(server, &registration_info_uri);
 
     char *post_buffer = malloc(MAX_POST_CONTENT_LENGTH);
     httpd_uri_t registration_uri = {
@@ -104,13 +105,13 @@ esp_err_t register_registration_handlers(httpd_handle_t *server)
         .method = HTTP_POST,
         .handler = handle_registration,
         .user_ctx = post_buffer};
-    httpd_register_uri_handler(*server, &registration_uri);
+    result += httpd_register_uri_handler(server, &registration_uri);
 
     httpd_uri_t unregistration_uri = {
         .uri = "/api/v1/registration/unregister/?",
         .method = HTTP_GET,
         .handler = handle_unregistration};
-    httpd_register_uri_handler(*server, &unregistration_uri);
+    result += httpd_register_uri_handler(server, &unregistration_uri);
 
-    return ESP_OK;
+    return result;
 }

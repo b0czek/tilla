@@ -18,6 +18,7 @@ sensor_drivers_t *init_drivers()
     ds18b20_driver_init(data, &ds18b20_config);
     drivers->ds18b20_driver = data;
 #endif
+#ifdef CONFIG_BME280_ENABLED
 
     i2c_config_t i2c_config = {
         .mode = I2C_MODE_MASTER,
@@ -38,6 +39,6 @@ sensor_drivers_t *init_drivers()
     bme280_driver_t *bme280_driver = bme280_driver_init(1000, dev_configs, sizeof(dev_configs) / sizeof(bme280_dev_config_t));
 
     drivers->bme280_driver = bme280_driver;
-
+#endif
     return drivers;
 }
