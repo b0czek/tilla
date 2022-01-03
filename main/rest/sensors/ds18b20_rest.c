@@ -19,7 +19,7 @@ cJSON *sensors_data_ds18b20(httpd_req_t *req)
 
         cJSON *sensor = cJSON_CreateObject();
         cJSON_AddNumberToObject(sensor, "error", device->error);
-        cJSON_AddNumberToObject(sensor, "value", device->reading);
+        cJSON_AddNumberToObject(sensor, "temperature", device->reading);
         cJSON_AddItemToObject(sensors, id, sensor);
         free(id);
     }
