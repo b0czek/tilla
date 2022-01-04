@@ -20,6 +20,14 @@ static const char *REST_TAG = "esp-rest";
         }                                                                              \
     } while (0)
 
+cJSON *api_version(httpd_req_t *req)
+{
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddNumberToObject(root, "api_version", API_VERSION);
+    return root;
+}
+json_handler(handle_api_version, api_version);
+
 esp_err_t start_rest_server(sensor_drivers_t *sensors)
 {
     // REST_CHECK(base_path, "wrong base path", err);
@@ -35,6 +43,12 @@ esp_err_t start_rest_server(sensor_drivers_t *sensors)
 
     ESP_LOGI(REST_TAG, "Starting HTTP Server");
     REST_CHECK(httpd_start(&server, &config) == ESP_OK, "Start server failed", err_start);
+
+    httpd_uri_t api_info_uri = {
+        .uri = "/api/?",
+        .method = HTTP_GET,
+        .handler = handle_api_version};
+    httpd_register_uri_handler(server, &api_info_uri);
 
     /* URI handlers for fetching data about device vitals */
     register_device_handlers(server);

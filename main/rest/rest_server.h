@@ -1,5 +1,8 @@
 #pragma once
 #include "drivers.h"
+
+#define API_VERSION 1
+
 // #include <esp_vfs.h>
 
 // #define FILE_PATH_MAX (ESP_VFS_PATH_MAX + 128)
