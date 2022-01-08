@@ -35,7 +35,7 @@ typedef struct
     ds18b20_config_t *config;
     TaskHandle_t xHandle;
     SemaphoreHandle_t xSemaphore;
-    bool error;
+    uint8_t error;
 
 } ds18b20_data_t;
 

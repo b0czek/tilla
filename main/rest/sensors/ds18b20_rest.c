@@ -8,7 +8,7 @@ cJSON *sensors_data_ds18b20(httpd_req_t *req)
     ds18b20_data_t *data = (ds18b20_data_t *)req->user_ctx;
     xSemaphoreTakeOrFail(data->xSemaphore, root);
 
-    cJSON_AddBoolToObject(root, "error", data->error);
+    cJSON_AddNumberToObject(root, "error", data->error);
     cJSON *sensors = cJSON_CreateObject();
     for (int i = 0; i < data->devices.length; i++)
     {
