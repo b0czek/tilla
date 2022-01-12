@@ -1,5 +1,6 @@
 #include "rest_utils.h"
 #include "nvs_flash.h"
+#include "nvs_utils.h"
 #include <esp_err.h>
 #include <esp_http_server.h>
 #include <cJSON.h>
@@ -47,28 +48,16 @@ bool rest_auth_check(httpd_req_t *req)
     key_buffer[AUTH_KEY_LENGTH] = '\0';
     free(buffer);
 
-    size_t length;
-    nvs_handle_t handle;
-    nvs_open("rest", NVS_READONLY, &handle);
-
-    if (nvs_get_str(handle, "auth_key", 0, &length) != ESP_OK)
+    char *key = read_nvs_str("auth_key");
+    if (key == NULL)
     {
-        ESP_LOGW(REST_AUTH_TAG, "could not read key length");
         return false;
     }
+    bool result = strcmp(key, key_buffer) == 0;
 
-    char key[length];
+    free(key);
 
-    esp_err_t nvs_read = nvs_get_str(handle, "auth_key", key, &length);
-    if (nvs_read != ESP_OK)
-    {
-        ESP_LOGW(REST_AUTH_TAG, "could not read key from nvs - %d", nvs_read);
-        return false;
-    }
-
-    nvs_close(handle);
-
-    return strcmp(key, key_buffer) == 0;
+    return result;
 }
 
 cJSON *unauthenticated_handler(httpd_req_t *req)
