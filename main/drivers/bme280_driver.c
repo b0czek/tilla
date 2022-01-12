@@ -11,6 +11,13 @@
 
 #define DRIVER_TAG "bme280_driver"
 
+// round to two decimal places
+double round_double(double var)
+{
+    double value = (int)(var * 100 + .5);
+    return (double)value / 100;
+}
+
 static int vec_push_check(int r, int x)
 {
     return r;
@@ -121,6 +128,9 @@ static void task_bme280_normal_mode(void *sensor_ptr)
             bme280_sensor_t *sensor = (driver->sensors.data) + i;
 
             sensor->error = bme280_get_sensor_data(BME280_ALL, &(sensor->data), &(sensor->dev));
+            sensor->data.temperature = round_double(sensor->data.temperature);
+            sensor->data.humidity = round_double(sensor->data.humidity);
+            sensor->data.pressure = (int)sensor->data.pressure;
             // print_sensor_data(sensor);
         }
         xSemaphoreGive(driver->xSemaphore);
@@ -163,14 +173,18 @@ bme280_driver_t *bme280_driver_init(uint32_t reading_interval, bme280_dev_config
     bme280_driver_t *driver = calloc(1, sizeof(bme280_driver_t));
     driver->reading_interval = reading_interval;
     vec_init(&driver->sensors);
+    int retries = 0;
 
     for (int i = 0; i < cfg_len; i++)
     {
         bme280_sensor_t sensor = {0};
         memcpy(&sensor.config, dev_configs + i, sizeof(bme280_dev_config_t));
         vec_push_check vec_push(&(driver->sensors), sensor);
-
-        sensor.error = bme280_device_init(driver->sensors.data + i);
+        do
+        {
+            sensor.error = bme280_device_init(driver->sensors.data + i);
+            retries++;
+        } while (sensor.error != 0 && retries < BME280_INIT_RETRY_COUNT);
     }
 
     driver->xSemaphore = xSemaphoreCreateMutex();

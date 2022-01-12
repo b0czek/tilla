@@ -8,6 +8,8 @@
 #include "driver/i2c.h"
 #include <vec.h>
 
+#define BME280_INIT_RETRY_COUNT 5
+
 typedef struct bme280_dev bme280_dev_t;
 typedef struct bme280_data bme280_data_t;
 
