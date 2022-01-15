@@ -82,7 +82,7 @@ cJSON *register_device(httpd_req_t *req)
     }
 
     cJSON *device_uuid = get_json_field(body_root, "device_uuid");
-    if (device_uuid == NULL || !cJSON_IsString(device_uuid))
+    if (device_uuid == NULL || !cJSON_IsString(device_uuid) || strlen(device_uuid->valuestring) != UUID_LENGTH)
     {
         REJECT(req, "Invalid device uuid");
     }
@@ -93,6 +93,12 @@ cJSON *register_device(httpd_req_t *req)
         REJECT(req, "Invalid callback host");
     }
 
+    cJSON *callback_port = get_json_field(body_root, "callback_port");
+    if (callback_port == NULL || !cJSON_IsNumber(callback_port))
+    {
+        REJECT(req, "Invalid callback port");
+    }
+
     esp_err_t result = 0;
 
     nvs_handle_t handle;
@@ -101,6 +107,7 @@ cJSON *register_device(httpd_req_t *req)
     result += nvs_set_str(handle, "auth_key", auth_key->valuestring);
     result += nvs_set_str(handle, "device_uuid", device_uuid->valuestring);
     result += nvs_set_str(handle, "callback_host", callback_host->valuestring);
+    result += nvs_set_i32(handle, "callback_port", callback_port->valueint);
     result += nvs_commit(handle);
     nvs_close(handle);
 
@@ -125,6 +132,7 @@ cJSON *unregister_device(httpd_req_t *req)
     result += nvs_erase_key(handle, "auth_key");
     result += nvs_erase_key(handle, "device_uuid");
     result += nvs_erase_key(handle, "callback_host");
+    result += nvs_erase_key(handle, "callback_port");
     result += nvs_commit(handle);
     nvs_close(handle);
     cJSON *root = cJSON_CreateObject();
