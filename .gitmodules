@@ -12,7 +12,7 @@
 	url = git@github.com:rxi/vec.git
 [submodule "components/bme280/driver"]
 	path = components/bme280/driver
-	url = git@github.com:BoschSensortec/BME280_driver.git
+	url = https://github.com/BoschSensortec/BME280_driver
 [submodule "components/lvgl"]
 	path = components/lvgl
 	url = https://github.com/lvgl/lvgl.git
