@@ -130,7 +130,8 @@ static void task_bme280_normal_mode(void *sensor_ptr)
             sensor->error = bme280_get_sensor_data(BME280_ALL, &(sensor->data), &(sensor->dev));
             sensor->data.temperature = round_double(sensor->data.temperature);
             sensor->data.humidity = round_double(sensor->data.humidity);
-            sensor->data.pressure = (int)sensor->data.pressure;
+            // convert to hPa
+            sensor->data.pressure = ((double)((int)sensor->data.pressure)) / 100;
             // print_sensor_data(sensor);
         }
         xSemaphoreGive(driver->xSemaphore);
