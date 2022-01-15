@@ -9,16 +9,6 @@
 
 #define REST_AUTH_TAG "rest_auth"
 
-bool rest_register_check()
-{
-    size_t length;
-    nvs_handle_t handle;
-    nvs_open("rest", NVS_READONLY, &handle);
-    bool res = nvs_get_str(handle, "auth_key", 0, &length) == ESP_OK && length == AUTH_KEY_LENGTH + 1;
-    nvs_close(handle);
-    return res;
-}
-
 bool rest_auth_check(httpd_req_t *req)
 {
     if (!rest_register_check())
