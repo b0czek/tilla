@@ -9,36 +9,42 @@
 #include "freertos/semphr.h"
 #include "esp_system.h"
 #include "driver/gpio.h"
+#include <esp_log.h>
 
-#include "lvgl/lvgl.h"
+#include "lvgl.h"
 #include "lvgl_helpers.h"
 
+#include "display.h"
 #include "drivers.h"
+#include "fetcher/fetcher.h"
+#include "nvs_utils.h"
 
 #define TAG "display"
 #define LV_TICK_PERIOD_MS 1
 
 static void lv_tick_task(void *arg);
 static void guiTask(void *pvParameter);
-static void draw(sensor_drivers_t *drivers);
+// static void update(void *arg);
 
-void init_display(sensor_drivers_t *drivers)
+static void draw();
+
+SemaphoreHandle_t init_display()
 {
+    /* Creates a semaphore to handle concurrent call to lvgl stuff
+    * If you wish to call *any* lvgl function from other threads/tasks
+    * you should lock on the very same semaphore! */
+    SemaphoreHandle_t xGuiSemaphore = xSemaphoreCreateMutex();
 
     /* If you want to use a task to create the graphic, you NEED to create a Pinned task
-     * Otherwise there can be problem such as memory corruption and so on.
-     * NOTE: When not using Wi-Fi nor Bluetooth you can pin the guiTask to core 0 */
-    xTaskCreatePinnedToCore(guiTask, "gui", 4096 * 2, drivers, 0, NULL, 1);
-}
+       Otherwise there can be problem such as memory corruption and so on. */
+    xTaskCreatePinnedToCore(guiTask, "gui", 4096 * 2, xGuiSemaphore, 0, NULL, GUI_CORE);
 
-/* Creates a semaphore to handle concurrent call to lvgl stuff
- * If you wish to call *any* lvgl function from other threads/tasks
- * you should lock on the very same semaphore! */
-SemaphoreHandle_t xGuiSemaphore;
+    return xGuiSemaphore;
+}
 
 static void guiTask(void *pvParameter)
 {
-    xGuiSemaphore = xSemaphoreCreateMutex();
+    SemaphoreHandle_t xGuiSemaphore = pvParameter;
 
     lv_init();
 
@@ -87,7 +93,7 @@ static void guiTask(void *pvParameter)
     ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, LV_TICK_PERIOD_MS * 1000));
 
-    draw((sensor_drivers_t *)pvParameter);
+    draw();
 
     while (1)
     {
@@ -108,7 +114,7 @@ static void guiTask(void *pvParameter)
     vTaskDelete(NULL);
 }
 
-static void draw(sensor_drivers_t *drivers)
+static void draw()
 {
     // lv_theme_material_init()
     // /* Get the current screen  */
@@ -129,7 +135,7 @@ static void draw(sensor_drivers_t *drivers)
     lv_obj_set_size(btn, 120, 50);               /*Set its size*/
 
     lv_obj_t *label = lv_label_create(btn); /*Add a label to the button*/
-    lv_label_set_text_fmt(label, "%f", drivers->bme280_driver->sensors.data->data.temperature);
+    lv_label_set_text(label, "test");
 }
 
 static void lv_tick_task(void *arg)

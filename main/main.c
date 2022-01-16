@@ -8,11 +8,11 @@
 
 #include "network.h"
 #include "rest_server.h"
-#include "fs.h"
 #include "drivers.h"
 
 #ifdef CONFIG_USE_DISPLAY
 #include "display.h"
+#include "updater.h"
 #endif
 
 #define MDNS_INSTANCE "esp home web server"
@@ -44,8 +44,12 @@ void app_main(void)
     sensor_drivers_t *drivers = init_drivers();
 
 #ifdef CONFIG_USE_DISPLAY
-    init_display(drivers);
+    SemaphoreHandle_t xGuiSemaphore = init_display(drivers);
 #endif
     ESP_ERROR_CHECK(network_connect());
     ESP_ERROR_CHECK(start_rest_server(drivers));
+    // init the updater after the network has connected
+#ifdef CONFIG_USE_DISPLAY
+    display_updater_init(xGuiSemaphore);
+#endif
 }

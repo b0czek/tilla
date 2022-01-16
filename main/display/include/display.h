@@ -1,4 +1,7 @@
+#pragma once
 #include <lvgl.h>
 #include "drivers.h"
 
-void init_display(sensor_drivers_t *drivers);
+#define GUI_CORE 1
+
+SemaphoreHandle_t init_display();
