@@ -63,6 +63,8 @@ int remote_sensor_init_data_static(cJSON *sensor_json, remote_sensor_data_t *sen
 
     sensor_data->last_update_timestamp = 0;
 
+    sensor_data->update_counter = 0;
+
     cJSON *fields = cJSON_GetObjectItem(sensor_json, "fields");
     sensor_data->fields_count = cJSON_GetArraySize(fields);
     // calloc for easier deallaction later
@@ -138,14 +140,6 @@ void remote_sensor_free_data(remote_sensor_data_t *sensor_data)
     free(sensor_data);
 }
 
-void remote_sensors_set_error_state(remote_sensor_data_t *sensors_data, int sensors_data_count, bool state)
-{
-    for (int i = 0; i < sensors_data_count; i++)
-    {
-        (sensors_data + i)->error = state;
-    }
-}
-
 void remote_sensors_unload_field_data(cJSON *data_json, remote_sensor_field_t *sensor_field, int32_t new_samples_count, int32_t sample_count)
 {
     // base describes how many elements remain unchanged,
@@ -180,53 +174,50 @@ void remote_sensors_unload_field_data(cJSON *data_json, remote_sensor_field_t *s
     }
 }
 
-void remote_sensors_update_data(cJSON *sync_json, remote_sensor_data_t *sensors_data, int sensors_data_count)
+void remote_sensors_update_data(cJSON *sync_json, remote_sensor_data_t *sensor_data)
 {
     cJSON *error_json = cJSON_GetObjectItem(sync_json, "error");
     bool error = cJSON_IsInvalid(error_json) || cJSON_IsTrue(error_json);
+    sensor_data->error = error;
 
-    remote_sensors_set_error_state(sensors_data, sensors_data_count, error);
     if (error)
     {
         return;
     }
 
     cJSON *sensors = cJSON_GetObjectItem(sync_json, "sensors");
-    for (int i = 0; i < sensors_data_count; i++)
+
+    cJSON *sensor = cJSON_GetObjectItem(sensors, sensor_data->remote_sensor_uuid);
+    if (!sensor)
     {
-        remote_sensor_data_t *sensor_data = sensors_data + i;
+        sensor_data->error = true;
+        return;
+    }
 
-        cJSON *sensor = cJSON_GetObjectItem(sensors, sensors_data->remote_sensor_uuid);
-        if (!sensor)
-        {
-            sensor_data->error = true;
-            continue;
-        }
+    sensor_data->error = cJSON_IsTrue(cJSON_GetObjectItem(sensor, "error"));
+    if (sensor_data->error)
+    {
+        return;
+    }
 
-        sensor_data->error = cJSON_IsTrue(cJSON_GetObjectItem(sensor, "error"));
-        if (sensor_data->error)
-        {
-            continue;
-        }
-        sensor_data->device_online = cJSON_IsTrue(cJSON_GetObjectItem(sensor, "device_online"));
+    sensor_data->device_online = cJSON_IsTrue(cJSON_GetObjectItem(sensor, "device_online"));
 
-        sensor_data->last_update_timestamp = cJSON_GetNumberValue(cJSON_GetObjectItem(sensor, "closing_timestamp"));
+    sensor_data->last_update_timestamp = cJSON_GetNumberValue(cJSON_GetObjectItem(sensor, "closing_timestamp"));
 
-        cJSON *current_values = cJSON_GetObjectItem(sensor, "current_values");
-        cJSON *data = cJSON_GetObjectItem(sensor, "data");
+    cJSON *current_values = cJSON_GetObjectItem(sensor, "current_values");
+    cJSON *data = cJSON_GetObjectItem(sensor, "data");
 
-        int32_t new_samples_count = fmin(
-            sensor_data->sample_count,
-            cJSON_GetNumberValue(cJSON_GetObjectItem(sensor, "new_samples_count")));
+    int32_t new_samples_count = fmin(
+        sensor_data->sample_count,
+        cJSON_GetNumberValue(cJSON_GetObjectItem(sensor, "new_samples_count")));
 
-        for (int j = 0; j < sensor_data->fields_count; j++)
-        {
-            remote_sensor_field_t *field = sensor_data->fields + i;
-            // update current values
-            field->current_value = cJSON_GetNumberValue(cJSON_GetObjectItem(current_values, field->name));
+    for (int i = 0; i < sensor_data->fields_count; i++)
+    {
+        remote_sensor_field_t *field = sensor_data->fields + i;
+        // update current values
+        field->current_value = cJSON_GetNumberValue(cJSON_GetObjectItem(current_values, field->name));
 
-            // and update values vec
-            remote_sensors_unload_field_data(data, field, new_samples_count, sensor_data->sample_count);
-        }
+        // and update values vec
+        remote_sensors_unload_field_data(data, field, new_samples_count, sensor_data->sample_count);
     }
 }

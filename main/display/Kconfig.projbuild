@@ -1,0 +1,26 @@
+menu "Display config"
+    config USE_DISPLAY
+        bool "use display"
+        default n
+    if USE_DISPLAY    
+        config LV_HOR_RES_MAX
+            int "Maximal horizontal resolution to support by the library."
+            default 240
+
+        config LV_VER_RES_MAX
+            int "Maximal vertical resolution to support by the library."
+            default 320 
+
+        config ENCODER_GPIO_A
+            int "Rotary Encoder A output GPIO number"
+            range 0 39
+            default 39
+        
+        config ENCODER_GPIO_B
+            int "Rotary Encoder B output GPIO number"
+            range 0 39
+            default 36
+        
+    endif
+
+endmenu

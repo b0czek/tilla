@@ -1,6 +1,6 @@
 #pragma once
 #include "lvgl.h"
-#include "updater.h"
+#include "remote_sensor.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 

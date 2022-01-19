@@ -34,6 +34,8 @@ typedef struct remote_sensor_data_t
     bool error;
     bool device_online;
 
+    int32_t update_counter;
+
     uint64_t last_update_timestamp;
 
 } remote_sensor_data_t;
@@ -50,4 +52,4 @@ void remote_sensor_free_data_static(remote_sensor_data_t *sensor_data);
 // frees struct members and the struct
 void remote_sensor_free_data(remote_sensor_data_t *sensor_data);
 
-void remote_sensors_update_data(cJSON *sync_json, remote_sensor_data_t *sensors_data, int sensors_data_count);
+void remote_sensors_update_data(cJSON *sync_json, remote_sensor_data_t *sensor_data);

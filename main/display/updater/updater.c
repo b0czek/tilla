@@ -8,6 +8,8 @@
 #include "layout.h"
 #include "remote_sensor.h"
 
+#include "encoder.h"
+
 #define TAG "updater"
 static void update(void *arg);
 
@@ -36,9 +38,9 @@ json_err:
     return NULL;
 }
 
-cJSON *get_sync(fetcher_client_t *client, uint64_t last_update_timestamp)
+cJSON *get_sync(fetcher_client_t *client, const char *remote_sensor_uuid, uint64_t last_update_timestamp)
 {
-    char *query = sprintf_query("since=%lld", last_update_timestamp);
+    char *query = sprintf_query("since=%lld&remote_sensor_uuid=%s", last_update_timestamp, remote_sensor_uuid);
     esp_err_t res = make_http_request(client, SYNC, query);
     free(query);
     ESP_LOGD(TAG, "HTTP FETCH SYNC: %d", res);
@@ -63,10 +65,18 @@ display_updater_t *display_updater_init(SemaphoreHandle_t xGuiSemaphore)
     }
 
     display_updater_t *updater = calloc(1, sizeof(display_updater_t));
+    updater->active_remote_sensor = 0;
     updater->xGuiSemaphore = xGuiSemaphore;
+    updater->xUpdaterSemaphore = xSemaphoreCreateMutex();
     updater->client = fetcher_client_init();
 
-    xTaskCreatePinnedToCore(update, "display_updater", 4096, updater, 0, &updater->xHandle, GUI_CORE);
+    xTaskCreatePinnedToCore(update, "display_updater", 4096, updater, 1, &updater->xHandle, GUI_CORE);
+
+    updater->encoder = encoder_init(updater);
+    if (!updater->encoder)
+    {
+        ESP_LOGE(TAG, "failed to initialize encoder");
+    }
 
     return updater;
 }
@@ -87,7 +97,6 @@ static void update(void *arg)
 
     cJSON *remote_sensors_json = cJSON_GetObjectItem(info, "sensors");
     int remote_sensors_count = cJSON_GetArraySize(remote_sensors_json);
-    updater->remote_sensors_count = remote_sensors_count;
 
     ESP_LOGI(TAG, "received display info, %d remote sensor(s) are registered", remote_sensors_count);
 
@@ -100,6 +109,7 @@ static void update(void *arg)
         }
     }
 
+    updater->remote_sensors_count = remote_sensors_count;
     updater->remote_sensors = malloc(sizeof(remote_sensor_data_t) * remote_sensors_count);
     for (int i = 0; i < remote_sensors_count; i++)
     {
@@ -108,28 +118,62 @@ static void update(void *arg)
     cJSON_Delete(remote_sensors_json);
 
     // initialize layout
-    updater_layout_t *layout = layout_init(updater->remote_sensors, updater->xGuiSemaphore);
+    updater->layout = layout_init(updater->remote_sensors, updater->xGuiSemaphore);
     ESP_LOGI(TAG, "initialized layout");
 
     while (1)
     {
-        cJSON *sync_json = get_sync(updater->client, updater->remote_sensors->last_update_timestamp);
-        if (!sync_json)
+        // if semaphore could not be locked, try again
+        if (xSemaphoreTake(updater->xUpdaterSemaphore, portMAX_DELAY) != pdTRUE)
         {
-            layout_set_error(layout, updater->remote_sensors, lv_palette_main(LV_PALETTE_RED), updater->xGuiSemaphore);
-            ESP_LOGE(TAG, "updating sensors failed");
-            goto delay;
+            ESP_LOGE(TAG, "updater semaphore could not be locked");
+            continue;
         }
-        ESP_LOGI(TAG, "syncing data");
-        remote_sensors_update_data(sync_json, updater->remote_sensors, updater->remote_sensors_count);
-        ESP_LOGI(TAG, "updating data on screen");
-        layout_update_data(layout, updater->remote_sensors, updater->xGuiSemaphore);
+        for (int i = 0; i < updater->remote_sensors_count; i++)
+        {
+            remote_sensor_data_t *remote_sensor = updater->remote_sensors + i;
 
-        cJSON_Delete(sync_json);
+            // increment the counter
+            remote_sensor->update_counter = (remote_sensor->update_counter + 1) % (remote_sensor->polling_interval / 1000);
 
-    delay:
-        vTaskDelay(updater->remote_sensors->polling_interval / portTICK_PERIOD_MS);
+            if (remote_sensor->update_counter != 1)
+            {
+                continue;
+            }
+
+            // if there was an error last sync, synchronize whole data
+            uint64_t timestamp = remote_sensor->error ? 0 : remote_sensor->last_update_timestamp;
+            // fetch data from the server
+            cJSON *sync_json = get_sync(updater->client, remote_sensor->remote_sensor_uuid, timestamp);
+            // if there was a problem fetching data
+            if (!sync_json)
+            {
+                ESP_LOGE(TAG, "updating sensor %s failed", remote_sensor->remote_sensor_uuid);
+
+                // set an error
+                remote_sensor->error = true;
+                // and if the error is on active sensor
+                if (updater->active_remote_sensor == i)
+                {
+                    layout_set_error(updater->layout, remote_sensor, lv_palette_main(LV_PALETTE_RED), updater->xGuiSemaphore);
+                }
+                continue;
+            }
+            remote_sensors_update_data(sync_json, remote_sensor);
+            // if the updated
+            if (updater->active_remote_sensor == i)
+            {
+                ESP_LOGI(TAG, "updating data on screen");
+                layout_update_data(updater->layout, remote_sensor, updater->xGuiSemaphore);
+            }
+            cJSON_Delete(sync_json);
+        }
+
+        xSemaphoreGive(updater->xUpdaterSemaphore);
+
+        // increment updater counters every second
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
-    layout_free(layout, updater->xGuiSemaphore);
+    layout_free(updater->layout, updater->xGuiSemaphore);
 }

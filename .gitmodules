@@ -19,3 +19,6 @@
 [submodule "components/lvgl_esp32_drivers"]
 	path = components/lvgl_esp32_drivers
 	url = https://github.com/lvgl/lvgl_esp32_drivers.git
+[submodule "components/esp32-rotary-encoder"]
+	path = components/esp32-rotary-encoder
+	url = git@github.com:DavidAntliff/esp32-rotary-encoder.git

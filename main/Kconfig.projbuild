@@ -13,21 +13,3 @@ menu "REST Server Configuration"
             Specify the mount point in VFS.
 
 endmenu
-menu "Display config"
-    config USE_DISPLAY
-        bool "use display"
-        default n
-    if USE_DISPLAY    
-        config LV_USE_THEME_MATERIAL
-            bool "Use material theme"
-            default y
-        config LV_HOR_RES_MAX
-            int "Maximal horizontal resolution to support by the library."
-            default 240
-
-        config LV_VER_RES_MAX
-            int "Maximal vertical resolution to support by the library."
-            default 320
-    endif
-
-endmenu
