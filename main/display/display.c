@@ -24,9 +24,6 @@
 
 static void lv_tick_task(void *arg);
 static void guiTask(void *pvParameter);
-// static void update(void *arg);
-
-static void draw();
 
 SemaphoreHandle_t init_display()
 {
@@ -93,8 +90,6 @@ static void guiTask(void *pvParameter)
     ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, LV_TICK_PERIOD_MS * 1000));
 
-    draw();
-
     while (1)
     {
         /* Delay 1 tick (assumes FreeRTOS tick is 10ms */
@@ -112,30 +107,6 @@ static void guiTask(void *pvParameter)
     free(buf1);
     free(buf2);
     vTaskDelete(NULL);
-}
-
-static void draw()
-{
-    // lv_theme_material_init()
-    // /* Get the current screen  */
-
-    // lv_obj_t *scr = lv_disp_get_scr_act(NULL);
-
-    // /*Create a Label on the currently active screen*/
-    // lv_obj_t *label1 = lv_label_create(scr);
-
-    // /*Modify the Label's text*/
-    // lv_label_set_text(label1, "Hello\nworld");
-
-    /* Align the Label to the center1
-     * 0, 0 at the end means an x, y offset after alignment*/
-    // lv_obj_align(label1, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_t *btn = lv_btn_create(lv_scr_act()); /*Add a button the current screen*/
-    lv_obj_set_pos(btn, 10, 10);                 /*Set its position*/
-    lv_obj_set_size(btn, 120, 50);               /*Set its size*/
-
-    lv_obj_t *label = lv_label_create(btn); /*Add a label to the button*/
-    lv_label_set_text(label, "test");
 }
 
 static void lv_tick_task(void *arg)
