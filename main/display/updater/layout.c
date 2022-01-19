@@ -1,6 +1,8 @@
 #include "layout.h"
 #include "updater.h"
 
+#include <esp_log.h>
+
 #define CHART_HEIGHT 160
 #define MARGIN 20
 #define FULL_WIDTH CONFIG_LV_HOR_RES_MAX - MARGIN * 2
@@ -139,7 +141,7 @@ int layout_set_error(updater_layout_t *layout, remote_sensor_data_t *remote_sens
     }
 
     lv_obj_set_style_outline_color(layout->parent, color, 0);
-    for (int i = 0; remote_sensor->fields_count; i++)
+    for (int i = 0; i < remote_sensor->fields_count; i++)
     {
         set_field_value((layout->field_objects + i)->field, remote_sensor->fields + i, 0.0);
     }

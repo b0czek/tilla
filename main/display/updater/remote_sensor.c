@@ -156,7 +156,7 @@ void remote_sensors_unload_field_data(cJSON *data_json, remote_sensor_field_t *s
     // for example if there are 4 new samples in 10 sample array,
     // move 6 latest to the beginning to make room for new ones
     memmove(sensor_field->values, sensor_field->values + new_samples_count, move_size);
-    ESP_LOGI("chuj", "moving %d bytes in field data values, new samples: %d", move_size, new_samples_count);
+    ESP_LOGD(TAG, "moving %d bytes in field data values, new samples: %d", move_size, new_samples_count);
 
     int data_length = cJSON_GetArraySize(data_json);
     int sample_index = 0;
