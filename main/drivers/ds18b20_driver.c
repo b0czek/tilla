@@ -1,3 +1,4 @@
+#include "vec_helper.h"
 #include "ds18b20_driver.h"
 #include <esp_err.h>
 #include <esp_log.h>
@@ -6,7 +7,6 @@
 #include <string.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
-
 #define DRIVER_TAG "ds18b20_driver"
 
 #define DATA_CALLOC_CHECK(data_ptr, ref) \
@@ -15,14 +15,6 @@
         ds18b20_driver_free(data_ptr);   \
         return ESP_ERR_NO_MEM;           \
     }
-
-// vec_push returns '(int, int)' for some reason and i cant get it to work
-// so i use the macro output as function parameter
-// vec_push_check vec_push(v, val)
-static int vec_push_check(int r, int x)
-{
-    return r;
-}
 
 static void vTaskReadDevices(void *data)
 {

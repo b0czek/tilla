@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "freertos/task.h"
+#include "vec_helper.h"
 
 #include <esp_err.h>
 
@@ -16,11 +17,6 @@ double round_double(double var)
 {
     double value = (int)(var * 100 + .5);
     return (double)value / 100;
-}
-
-static int vec_push_check(int r, int x)
-{
-    return r;
 }
 
 void i2c_init(i2c_config_t *config, i2c_port_t i2c_num)
