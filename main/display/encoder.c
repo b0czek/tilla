@@ -61,9 +61,8 @@ static void handler(void *arg)
                 updater->active_remote_sensor = (updater->active_remote_sensor + direction) % updater->remote_sensors_count;
             }
 
-            layout_free(updater->layout, updater->xGuiSemaphore);
-            updater->layout = layout_init(updater->remote_sensors + updater->active_remote_sensor, updater->xGuiSemaphore);
-            layout_update_data(updater->layout, updater->remote_sensors + updater->active_remote_sensor, updater->xGuiSemaphore);
+            remote_sensor_data_t *active_sensor = updater->remote_sensors + updater->active_remote_sensor;
+            updater->layout = layout_reload(updater->layout, active_sensor, updater->xGuiSemaphore);
         }
 
         xSemaphoreGive(updater->xUpdaterSemaphore);

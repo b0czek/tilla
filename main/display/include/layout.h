@@ -28,3 +28,5 @@ void layout_free(updater_layout_t *layout, SemaphoreHandle_t xGuiSemaphore);
 int layout_set_error(updater_layout_t *layout, remote_sensor_data_t *remote_sensor, lv_color_t color, SemaphoreHandle_t xGuiSemaphore);
 
 int layout_update_data(updater_layout_t *layout, remote_sensor_data_t *remote_sensor, SemaphoreHandle_t xGuiSemaphore);
+
+updater_layout_t *layout_reload(updater_layout_t *layout, remote_sensor_data_t *remote_sensor, SemaphoreHandle_t xGuiSemaphore);

@@ -10,6 +10,26 @@
 
 #define OUTLINE_WIDTH 3
 
+#define VOID
+/**
+ * @brief macro used for taking a samephore if it is not null and returning passed value when that fails, 
+ * in case of void function use `xSemaphoreTakeIfNotNullOrFail(xSemaphore, VOID);` for better readability
+ */
+#define xSemaphoreTakeIfNotNullOrFail(xSemaphore, returnValueOnFail) \
+    if (xSemaphore)                                                  \
+    {                                                                \
+        if (xSemaphoreTake(xSemaphore, portMAX_DELAY) != pdTRUE)     \
+        {                                                            \
+            return returnValueOnFail;                                \
+        }                                                            \
+    }
+
+#define xSemaphoreGiveIfNotNull(xSemaphore) \
+    if (xSemaphore)                         \
+    {                                       \
+        xSemaphoreGive(xSemaphore);         \
+    }
+
 static void create_parent_obj(updater_layout_t *layout)
 {
     layout->parent = lv_obj_create(lv_scr_act());
@@ -77,17 +97,15 @@ static void create_field_labels(updater_layout_t *layout, remote_sensor_data_t *
 updater_layout_t *layout_init(remote_sensor_data_t *remote_sensor, SemaphoreHandle_t xGuiSemaphore)
 {
     // lock the gui
-    if (xSemaphoreTake(xGuiSemaphore, portMAX_DELAY) != pdTRUE)
-    {
-        return NULL;
-    }
+    xSemaphoreTakeIfNotNullOrFail(xGuiSemaphore, NULL);
+
     // allocate memory for layout struct
     updater_layout_t *layout = malloc(sizeof(updater_layout_t));
 
     // if allocation fails, unlock gui and return null
     if (layout == NULL)
     {
-        xSemaphoreGive(xGuiSemaphore);
+        xSemaphoreGiveIfNotNull(xGuiSemaphore);
         return NULL;
     }
     // if there are more than 1 field
@@ -101,7 +119,7 @@ updater_layout_t *layout_init(remote_sensor_data_t *remote_sensor, SemaphoreHand
             // free the layout memory
             free(layout);
             // unlock gui
-            xSemaphoreGive(xGuiSemaphore);
+            xSemaphoreGiveIfNotNull(xGuiSemaphore);
             return NULL;
         }
         layout->field_objects_count = remote_sensor->fields_count;
@@ -120,7 +138,7 @@ updater_layout_t *layout_init(remote_sensor_data_t *remote_sensor, SemaphoreHand
 
     create_chart(layout, remote_sensor);
 
-    xSemaphoreGive(xGuiSemaphore);
+    xSemaphoreGiveIfNotNull(xGuiSemaphore);
     return layout;
 }
 
@@ -132,13 +150,7 @@ static void set_field_value(lv_obj_t *label, remote_sensor_field_t *field, doubl
 int layout_set_error(updater_layout_t *layout, remote_sensor_data_t *remote_sensor, lv_color_t color, SemaphoreHandle_t xGuiSemaphore)
 {
     // if semaphore is provided, lock it
-    if (xGuiSemaphore)
-    {
-        if (xSemaphoreTake(xGuiSemaphore, portMAX_DELAY) != pdTRUE)
-        {
-            return -1;
-        }
-    }
+    xSemaphoreTakeIfNotNullOrFail(xGuiSemaphore, -1);
 
     lv_obj_set_style_outline_color(layout->parent, color, 0);
     for (int i = 0; i < remote_sensor->fields_count; i++)
@@ -147,19 +159,13 @@ int layout_set_error(updater_layout_t *layout, remote_sensor_data_t *remote_sens
     }
 
     // unlock semaphore if it was given
-    if (xGuiSemaphore)
-    {
-        xSemaphoreGive(xGuiSemaphore);
-    }
+    xSemaphoreGiveIfNotNull(xGuiSemaphore);
     return 0;
 }
 
 int layout_update_data(updater_layout_t *layout, remote_sensor_data_t *remote_sensor, SemaphoreHandle_t xGuiSemaphore)
 {
-    if (xSemaphoreTake(xGuiSemaphore, portMAX_DELAY) != pdTRUE)
-    {
-        return -1;
-    }
+    xSemaphoreTakeIfNotNullOrFail(xGuiSemaphore, -1);
 
     lv_chart_refresh(layout->chart);
 
@@ -167,7 +173,7 @@ int layout_update_data(updater_layout_t *layout, remote_sensor_data_t *remote_se
     if (remote_sensor->error || !remote_sensor->device_online)
     {
         layout_set_error(layout, remote_sensor, lv_palette_main(LV_PALETTE_ORANGE), NULL);
-        xSemaphoreGive(xGuiSemaphore);
+        xSemaphoreGiveIfNotNull(xGuiSemaphore);
         return 0;
     }
     // set current values
@@ -178,16 +184,32 @@ int layout_update_data(updater_layout_t *layout, remote_sensor_data_t *remote_se
     }
     lv_obj_set_style_outline_color(layout->parent, lv_palette_main(LV_PALETTE_GREY), 0);
 
-    xSemaphoreGive(xGuiSemaphore);
+    xSemaphoreGiveIfNotNull(xGuiSemaphore);
+
     return 0;
+}
+
+updater_layout_t *layout_reload(updater_layout_t *layout, remote_sensor_data_t *remote_sensor, SemaphoreHandle_t xGuiSemaphore)
+{
+    xSemaphoreTakeIfNotNullOrFail(xGuiSemaphore, NULL);
+
+    layout_free(layout, NULL);
+    updater_layout_t *new_layout = layout_init(remote_sensor, NULL);
+    layout_update_data(new_layout, remote_sensor, NULL);
+
+    xSemaphoreGiveIfNotNull(xGuiSemaphore);
+
+    return new_layout;
 }
 
 void layout_free(updater_layout_t *layout, SemaphoreHandle_t xGuiSemaphore)
 {
+    if (!layout)
+        return;
 
-    xSemaphoreTake(xGuiSemaphore, portMAX_DELAY);
+    xSemaphoreTakeIfNotNullOrFail(xGuiSemaphore, VOID);
     lv_obj_del(layout->parent);
     free(layout->field_objects);
     free(layout);
-    xSemaphoreGive(xGuiSemaphore);
+    xSemaphoreGiveIfNotNull(xGuiSemaphore);
 }
