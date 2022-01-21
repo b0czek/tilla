@@ -18,6 +18,14 @@ char *strdup(const char *str1)
     return str;
 }
 
+static void remote_sensor_field_clear_values(remote_sensor_field_t *field, int32_t sample_count)
+{
+    for (int i = 0; i < sample_count; i++)
+    {
+        *(field->values + i) = INT16_MAX;
+    }
+}
+
 int remote_sensor_field_init_data(cJSON *field_json, remote_sensor_field_t *field, int32_t sample_count)
 {
     field->label = strdup(cJSON_GetObjectItem(field_json, "label")->valuestring);
@@ -39,10 +47,7 @@ int remote_sensor_field_init_data(cJSON *field_json, remote_sensor_field_t *fiel
         ESP_LOGE(TAG, "COULD NOT ALLOCATE %dB OF MEMORY FOR FIELD VALUES", sample_count * sizeof(int16_t));
         return -1;
     }
-    for (int i = 0; i < sample_count; i++)
-    {
-        *(field->values + i) = INT16_MAX;
-    }
+    remote_sensor_field_clear_values(field, sample_count);
 
     return 0;
 }
@@ -216,6 +221,9 @@ void remote_sensors_update_data(cJSON *sync_json, remote_sensor_data_t *sensor_d
         remote_sensor_field_t *field = sensor_data->fields + i;
         // update current values
         field->current_value = cJSON_GetNumberValue(cJSON_GetObjectItem(current_values, field->name));
+
+        // if there was an error, clear whole values array
+        remote_sensor_field_clear_values(field, sensor_data->sample_count);
 
         // and update values vec
         remote_sensors_unload_field_data(data, field, new_samples_count, sensor_data->sample_count);
