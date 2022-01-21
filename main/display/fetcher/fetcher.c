@@ -104,7 +104,6 @@ char *build_url(fetcher_client_t *client, const char *path, const char *query_ar
                               client->auth_key,
                               query_args);
 
-    ESP_LOGD(TAG, "querying: %s", url);
     return url;
 }
 
@@ -112,6 +111,7 @@ esp_err_t
 make_http_request(fetcher_client_t *client, server_endpoints_t endpoint, const char *query_args)
 {
     char *url = build_url(client, endpoint_uris[endpoint], query_args);
+
     if (url == NULL)
     {
         ESP_LOGE(TAG, "url for endpoint %s could not be built", endpoint_uris[endpoint]);
@@ -119,6 +119,12 @@ make_http_request(fetcher_client_t *client, server_endpoints_t endpoint, const c
     }
     esp_http_client_set_url(client->http_client, url);
     free(url);
+
+    ESP_LOGD(TAG, "querying: http://%s:%d%s",
+             client->callback_host,
+             client->callback_port,
+             endpoint_uris[endpoint]);
+
     esp_err_t result = esp_http_client_perform(client->http_client);
 
     // esp handles http requests much better when they are closed each time
