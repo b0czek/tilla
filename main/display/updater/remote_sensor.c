@@ -223,7 +223,10 @@ void remote_sensors_update_data(cJSON *sync_json, remote_sensor_data_t *sensor_d
         field->current_value = cJSON_GetNumberValue(cJSON_GetObjectItem(current_values, field->name));
 
         // if there was an error, clear whole values array
-        remote_sensor_field_clear_values(field, sensor_data->sample_count);
+        if (sensor_data->error)
+        {
+            remote_sensor_field_clear_values(field, sensor_data->sample_count);
+        }
 
         // and update values vec
         remote_sensors_unload_field_data(data, field, new_samples_count, sensor_data->sample_count);
