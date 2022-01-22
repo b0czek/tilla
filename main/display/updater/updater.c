@@ -151,16 +151,20 @@ static void update(void *arg)
                 ESP_LOGE(TAG, "updating sensor %s failed", remote_sensor->remote_sensor_uuid);
 
                 // set an error
-                remote_sensor->error = true;
-                // and if the error is on active sensor
+                // * not resetting the erroron successful query is done on purpose,
+                // * because update_data function will do it either way and if there was an error on previous fetch
+                // * field values array would not be cleared
+                remote_sensor_set_error_state(remote_sensor, true);
+
+                // and if the error is on active sensor, set error on layout
                 if (updater->active_remote_sensor == i)
                 {
                     layout_set_error(updater->layout, remote_sensor, lv_palette_main(LV_PALETTE_RED), updater->xGuiSemaphore);
                 }
                 continue;
             }
-            remote_sensors_update_data(sync_json, remote_sensor);
-            // if the updated
+            remote_sensor_update_data(sync_json, remote_sensor);
+            // if the updated sensor is currently displayed
             if (updater->active_remote_sensor == i)
             {
                 ESP_LOGI(TAG, "updating data on screen");

@@ -6,6 +6,16 @@
 
 #define TAG "remote_sensor"
 
+#ifndef VOID
+#define VOID
+#endif
+
+#define return_if_error(err, return_value) \
+    if (err)                               \
+    {                                      \
+        return return_value;               \
+    }
+
 char *strdup(const char *str1)
 {
     int str_len = strlen(str1) + 1;
@@ -20,10 +30,18 @@ char *strdup(const char *str1)
 
 static void remote_sensor_field_clear_values(remote_sensor_field_t *field, int32_t sample_count)
 {
+    ESP_LOGI(TAG, "clearing values of field with %d samples", sample_count);
     for (int i = 0; i < sample_count; i++)
     {
         *(field->values + i) = INT16_MAX;
     }
+}
+
+static void remote_sensor_field_push_value(remote_sensor_field_t *field, int32_t sample_count, int16_t value)
+{
+    // move whole array left by one element
+    memmove(field->values, field->values + 1, (sample_count - 1) * sizeof(int16_t));
+    *(field->values + sample_count - 1) = value;
 }
 
 int remote_sensor_field_init_data(cJSON *field_json, remote_sensor_field_t *field, int32_t sample_count)
@@ -145,7 +163,7 @@ void remote_sensor_free_data(remote_sensor_data_t *sensor_data)
     free(sensor_data);
 }
 
-void remote_sensors_unload_field_data(cJSON *data_json, remote_sensor_field_t *sensor_field, int32_t new_samples_count, int32_t sample_count)
+void remote_sensor_unload_field_data(cJSON *data_json, remote_sensor_field_t *sensor_field, int32_t new_samples_count, int32_t sample_count)
 {
     // base describes how many elements remain unchanged,
     // and determines the offset on setting new values
@@ -179,31 +197,41 @@ void remote_sensors_unload_field_data(cJSON *data_json, remote_sensor_field_t *s
     }
 }
 
-void remote_sensors_update_data(cJSON *sync_json, remote_sensor_data_t *sensor_data)
+void remote_sensor_set_error_state(remote_sensor_data_t *sensor_data, bool error)
 {
-    cJSON *error_json = cJSON_GetObjectItem(sync_json, "error");
-    bool error = cJSON_IsInvalid(error_json) || cJSON_IsTrue(error_json);
     sensor_data->error = error;
-
+    // when error is set, push empty value to values array to represent time elapsed since error,
+    // upon sucessful sync, whole array will be replaced either way
     if (error)
     {
-        return;
+        for (int i = 0; i < sensor_data->fields_count; i++)
+        {
+            remote_sensor_field_push_value(sensor_data->fields + i, sensor_data->sample_count, INT16_MAX);
+        }
     }
+}
+
+void remote_sensor_update_data(cJSON *sync_json, remote_sensor_data_t *sensor_data)
+{
+    bool was_error = sensor_data->error;
+
+    cJSON *error_json = cJSON_GetObjectItem(sync_json, "error");
+    bool error = cJSON_IsInvalid(error_json) || cJSON_IsTrue(error_json);
+
+    remote_sensor_set_error_state(sensor_data, error);
+    return_if_error(error, VOID);
 
     cJSON *sensors = cJSON_GetObjectItem(sync_json, "sensors");
 
     cJSON *sensor = cJSON_GetObjectItem(sensors, sensor_data->remote_sensor_uuid);
-    if (!sensor)
-    {
-        sensor_data->error = true;
-        return;
-    }
 
-    sensor_data->error = cJSON_IsTrue(cJSON_GetObjectItem(sensor, "error"));
-    if (sensor_data->error)
-    {
-        return;
-    }
+    // set error if there is no sensor with that uuid in response
+    remote_sensor_set_error_state(sensor_data, sensor == NULL);
+    return_if_error(sensor_data->error, VOID);
+
+    // or if the sensor has an error
+    remote_sensor_set_error_state(sensor_data, cJSON_IsTrue(cJSON_GetObjectItem(sensor, "error")));
+    return_if_error(sensor_data->error, VOID);
 
     sensor_data->device_online = cJSON_IsTrue(cJSON_GetObjectItem(sensor, "device_online"));
 
@@ -222,13 +250,13 @@ void remote_sensors_update_data(cJSON *sync_json, remote_sensor_data_t *sensor_d
         // update current values
         field->current_value = cJSON_GetNumberValue(cJSON_GetObjectItem(current_values, field->name));
 
-        // if there was an error, clear whole values array
-        if (sensor_data->error)
+        // if there was an error previously, clear whole values array
+        if (was_error)
         {
             remote_sensor_field_clear_values(field, sensor_data->sample_count);
         }
 
         // and update values vec
-        remote_sensors_unload_field_data(data, field, new_samples_count, sensor_data->sample_count);
+        remote_sensor_unload_field_data(data, field, new_samples_count, sensor_data->sample_count);
     }
 }
