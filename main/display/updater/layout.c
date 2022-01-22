@@ -9,10 +9,12 @@
 #define FULL_HEIGHT CONFIG_LV_VER_RES_MAX - MARGIN * 2
 
 #define OUTLINE_WIDTH 3
+#define X_AXIS_TICKS 3
+#define Y_AXIS_TICKS 5
 
 #define VOID
 /**
- * @brief macro used for taking a samephore if it is not null and returning passed value when that fails, 
+ * @brief macro used for taking a samephore if it is not null and returning passed value when that fails,
  * in case of void function use `xSemaphoreTakeIfNotNullOrFail(xSemaphore, VOID);` for better readability
  */
 #define xSemaphoreTakeIfNotNullOrFail(xSemaphore, returnValueOnFail) \
@@ -29,6 +31,39 @@
     {                                       \
         xSemaphoreGive(xSemaphore);         \
     }
+
+static int32_t get_tick_time(int32_t max_sample_age, int32_t value)
+{
+    // convert to seconds
+    max_sample_age /= 1000;
+
+    int32_t seconds_between_ticks = max_sample_age / (X_AXIS_TICKS - 1);
+    // invert the values, because they are numbered from left to right, starting with 0
+    int32_t inverted_value = X_AXIS_TICKS - (value + 1);
+
+    return inverted_value * seconds_between_ticks;
+}
+
+static void chart_draw_event_cb(lv_event_t *e)
+{
+    lv_obj_draw_part_dsc_t *dsc = lv_event_get_draw_part_dsc(e);
+    if (!lv_obj_draw_part_check_type(dsc, &lv_chart_class, LV_CHART_DRAW_PART_TICK_LABEL))
+        return;
+    if (dsc->id == LV_CHART_AXIS_PRIMARY_X && dsc->text)
+    {
+        // cast from user data
+        int32_t max_sample_age = (*(int32_t *)(e->user_data));
+
+        int32_t tick_time = get_tick_time(max_sample_age, dsc->value);
+        float tick_value = (float)tick_time / (tick_time < 3600 ? 60 : 3600.0);
+
+        // select formatter depending on whether the time is bigger than hour and if it has a decimal place
+        const char *formatter = tick_time < 3600 ? "%0.fm" : tick_value == (int)tick_value ? "%.0fh"
+                                                                                           : "%.1fh";
+        printf("%s %f\n", formatter, tick_value);
+        lv_snprintf(dsc->text, dsc->text_length, formatter, tick_value);
+    }
+}
 
 static void create_parent_obj(updater_layout_t *layout)
 {
@@ -65,13 +100,17 @@ static void create_chart(updater_layout_t *layout, remote_sensor_data_t *remote_
     // and point count
     lv_chart_set_point_count(layout->chart, remote_sensor->sample_count);
     lv_chart_set_div_line_count(layout->chart, 5, 5);
+
+    lv_chart_set_axis_tick(layout->chart, LV_CHART_AXIS_PRIMARY_X, 0, 0, X_AXIS_TICKS, 1, true, 20);
+    lv_obj_add_event_cb(layout->chart, chart_draw_event_cb, LV_EVENT_DRAW_PART_BEGIN, &remote_sensor->max_sample_age);
+
     for (int i = 0; i < remote_sensor->fields_count; i++)
     {
         remote_sensor_field_t *field = remote_sensor->fields + i;
 
         (layout->field_objects + i)->chart_series = lv_chart_add_series(layout->chart, lv_color_hex(field->color), field->priority);
         lv_chart_set_range(layout->chart, field->priority, field->range_min, field->range_max);
-        lv_chart_set_axis_tick(layout->chart, field->priority, 0, 0, 5, 1, true, 50);
+        lv_chart_set_axis_tick(layout->chart, field->priority, 0, 0, Y_AXIS_TICKS, 1, true, 50);
 
         lv_chart_set_ext_y_array(layout->chart, (layout->field_objects + i)->chart_series, field->values);
     }
