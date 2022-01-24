@@ -19,6 +19,7 @@ typedef struct
     uint8_t addr;
     i2c_port_t i2c_port;
 } bme280_dev_config_t;
+typedef vec_t(bme280_dev_config_t) bme280_dev_configs_t;
 
 typedef struct
 {

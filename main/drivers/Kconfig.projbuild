@@ -22,6 +22,55 @@ menu "Sensor drivers configuration"
         config BME280_ENABLED
             bool "Use BME280 sensors"
             default n
+        if BME280_ENABLED
+            config BME280_READING_INTERVAL
+                int "BME280 reading interval"
+                default 1000
+
+            config USE_I2C_BUS_0
+                bool "Use I2C bus 0"
+                default y
+            if USE_I2C_BUS_0
+                config I2C_BUS_0_SDA
+                    int "I2C bus 0 SDA gpio number"
+                    default 16
+                config I2C_BUS_0_SCL
+                    int "I2C bus 0 SCL gpio number"
+                    default 4
+                config I2C_BUS_0_PULLUP_SDA
+                    bool "I2C bus 0 SDA gpio pullup enable"
+                    default y
+                config I2C_BUS_0_PULLUP_SCL
+                    bool "I2C bus 0 SDA gpio pullup enable"
+                    default y
+            endif
+
+            config USE_I2C_BUS_1
+                bool "Use I2C bus 1"
+                default n
+            if USE_I2C_BUS_1
+                config I2C_BUS_1_SDA
+                    int "I2C bus 1 SDA gpio number"
+                    default 16
+                config I2C_BUS_1_SCL
+                    int "I2C bus 1 SCL gpio number"
+                    default 4
+                config I2C_BUS_1_PULLUP_SDA
+                    bool "I2C bus 1 SDA gpio pullup enable"
+                    default y
+                config I2C_BUS_1_PULLUP_SCL
+                    bool "I2C bus 1 SCL gpio pullup enable"
+                    default y
+            endif
+
+
+            config BME280_SENSOR_CONFIGS
+                string "BME280 sensor configs"
+                default "0x76@0"
+                help 
+                    configuration of sensors, in format hex_address_of_sensor@i2c_bus, separated by commas
+        endif
+
     endmenu
 
 
