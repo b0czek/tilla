@@ -58,9 +58,8 @@ static void chart_draw_event_cb(lv_event_t *e)
         float tick_value = (float)tick_time / (tick_time < 3600 ? 60 : 3600.0);
 
         // select formatter depending on whether the time is bigger than hour and if it has a decimal place
-        const char *formatter = tick_time < 3600 ? "%0.fm" : tick_value == (int)tick_value ? "%.0fh"
+        const char *formatter = tick_time < 3600 ? "%.0fm" : tick_value == (int)tick_value ? "%.0fh"
                                                                                            : "%.1fh";
-        printf("%s %f\n", formatter, tick_value);
         lv_snprintf(dsc->text, dsc->text_length, formatter, tick_value);
     }
 }
@@ -81,7 +80,7 @@ static void create_sensor_name_label(updater_layout_t *layout, remote_sensor_dat
     layout->sensor_name = lv_label_create(layout->parent);
     lv_obj_set_width(layout->sensor_name, FULL_WIDTH);
     lv_obj_set_style_text_align(layout->sensor_name, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_font(layout->sensor_name, &lv_font_montserrat_30, 0);
+    lv_obj_set_style_text_font(layout->sensor_name, &lv_font_montserrat_28, 0);
     lv_label_set_text_fmt(layout->sensor_name, "%s, %s", remote_sensor_data->sensor_name, remote_sensor_data->device_name);
 }
 
