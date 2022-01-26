@@ -10,8 +10,12 @@ typedef struct remote_sensor_field_t
     char *unit;
     uint32_t color;
     uint8_t priority;
+
     int16_t range_min;
     int16_t range_max;
+
+    int16_t alarm_lower_threshold;
+    int16_t alarm_upper_threshold;
 
     double current_value;
     int16_t *values;
@@ -43,6 +47,8 @@ typedef struct remote_sensor_data_t
     int32_t update_counter;
     // timestamp of last sample received in sync query
     uint64_t last_update_timestamp;
+
+    bool alarm_triggered;
 
 } remote_sensor_data_t;
 

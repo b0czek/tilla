@@ -53,10 +53,16 @@ int remote_sensor_field_init_data(cJSON *field_json, remote_sensor_field_t *fiel
     {
         return -1;
     }
-    field->range_min = (int16_t)cJSON_GetNumberValue(cJSON_GetObjectItem(field_json, "range_min"));
-    field->range_max = (int16_t)cJSON_GetNumberValue(cJSON_GetObjectItem(field_json, "range_max"));
     field->color = (int32_t)cJSON_GetNumberValue(cJSON_GetObjectItem(field_json, "color"));
     field->priority = (uint8_t)cJSON_GetNumberValue(cJSON_GetObjectItem(field_json, "priority"));
+
+    field->range_min = (int16_t)cJSON_GetNumberValue(cJSON_GetObjectItem(field_json, "range_min"));
+    field->range_max = (int16_t)cJSON_GetNumberValue(cJSON_GetObjectItem(field_json, "range_max"));
+
+    cJSON *lower_threshold = cJSON_GetObjectItem(field_json, "alarm_lower_threshold");
+    field->alarm_lower_threshold = cJSON_IsNull(lower_threshold) ? INT16_MIN : cJSON_GetNumberValue(lower_threshold);
+    cJSON *upper_threshold = cJSON_GetObjectItem(field_json, "alarm_upper_threshold");
+    field->alarm_upper_threshold = cJSON_IsNull(upper_threshold) ? INT16_MAX : cJSON_GetNumberValue(upper_threshold);
 
     field->current_value = 0.0;
     field->values = malloc(sample_count * sizeof(int16_t));
@@ -87,6 +93,8 @@ int remote_sensor_init_data_static(cJSON *sensor_json, remote_sensor_data_t *sen
     sensor_data->last_update_timestamp = 0;
 
     sensor_data->update_counter = 0;
+
+    sensor_data->alarm_triggered = false;
 
     cJSON *fields = cJSON_GetObjectItem(sensor_json, "fields");
     sensor_data->fields_count = cJSON_GetArraySize(fields);
@@ -247,8 +255,10 @@ void remote_sensor_update_data(cJSON *sync_json, remote_sensor_data_t *sensor_da
     for (int i = 0; i < sensor_data->fields_count; i++)
     {
         remote_sensor_field_t *field = sensor_data->fields + i;
-        // update current values
-        field->current_value = cJSON_GetNumberValue(cJSON_GetObjectItem(current_values, field->name));
+        // update current values, checking for null should not be needed, since at this points,
+        // if there was an error, the function would return
+        cJSON *current_value = cJSON_GetObjectItem(current_values, field->name);
+        field->current_value = cJSON_IsNull(current_value) ? INT16_MAX : cJSON_GetNumberValue(current_value);
 
         // if there was an error previously, clear whole values array
         if (was_error)

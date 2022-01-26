@@ -8,7 +8,7 @@
 #include "layout.h"
 #include "remote_sensor.h"
 
-#include "encoder.h"
+#include "peripherals.h"
 
 #define TAG "updater"
 static void update(void *arg);
@@ -72,12 +72,6 @@ display_updater_t *display_updater_init(SemaphoreHandle_t xGuiSemaphore)
 
     xTaskCreatePinnedToCore(update, "display_updater", 4096, updater, 1, &updater->xHandle, GUI_CORE);
 
-    updater->encoder = encoder_init(updater);
-    if (!updater->encoder)
-    {
-        ESP_LOGE(TAG, "failed to initialize encoder");
-    }
-
     return updater;
 }
 
@@ -110,6 +104,7 @@ static void update(void *arg)
     }
 
     updater->remote_sensors_count = remote_sensors_count;
+    // initialize structrures for remote sensors
     updater->remote_sensors = malloc(sizeof(remote_sensor_data_t) * remote_sensors_count);
     for (int i = 0; i < remote_sensors_count; i++)
     {
@@ -117,7 +112,14 @@ static void update(void *arg)
     }
     cJSON_Delete(remote_sensors_json);
 
-    // initialize layout
+    // initialize the peripherals
+    updater->peripherals = peripherals_init(updater);
+    if (!updater->peripherals)
+    {
+        ESP_LOGE(TAG, "failed to initialize peripherals");
+    }
+
+    // initialize layout with first element
     updater->layout = layout_init(updater->remote_sensors, updater->xGuiSemaphore);
     ESP_LOGI(TAG, "initialized layout");
 
@@ -145,6 +147,8 @@ static void update(void *arg)
             uint64_t timestamp = remote_sensor->error ? 0 : remote_sensor->last_update_timestamp;
             // fetch data from the server
             cJSON *sync_json = get_sync(updater->client, remote_sensor->remote_sensor_uuid, timestamp);
+            ESP_LOGI(TAG, "updating remote sensor %s %s", remote_sensor->sensor_name, remote_sensor->device_name);
+
             // if there was a problem fetching data
             if (!sync_json)
             {
@@ -171,6 +175,17 @@ static void update(void *arg)
                 layout_update_data(updater->layout, remote_sensor, updater->xGuiSemaphore);
             }
             cJSON_Delete(sync_json);
+
+#if ALARM_ENABLE
+
+            // if alarm is enabled, send currently updated sensor's index to it's queue
+            updater_alarm_t *alarm = updater->peripherals->alarm;
+            if (alarm && xQueueSend(alarm->sync_queue, (void *)&i, (TickType_t)10) != pdPASS)
+            {
+                ESP_LOGW(TAG, "remote sensor could not be sent to alarm's queue");
+            }
+
+#endif
         }
 
         xSemaphoreGive(updater->xUpdaterSemaphore);

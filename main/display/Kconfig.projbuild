@@ -11,16 +11,36 @@ menu "Display config"
             int "Maximal vertical resolution to support by the library."
             default 320 
 
-        config ENCODER_GPIO_A
-            int "Rotary Encoder A output GPIO number"
-            range 0 39
-            default 39
-        
-        config ENCODER_GPIO_B
-            int "Rotary Encoder B output GPIO number"
-            range 0 39
-            default 36
-        
+        config ENCODER_ENABLE 
+            bool "Use encoder"
+            default y
+
+        if ENCODER_ENABLE
+            config ENCODER_GPIO_A
+                int "Rotary Encoder A output GPIO number"
+                range 0 39
+                default 39
+            
+            config ENCODER_GPIO_B
+                int "Rotary Encoder B output GPIO number"
+                range 0 39
+                default 36
+        endif
+
+        config ALARM_ENABLE
+            bool "Enable alarm"
+            default n
+        if ALARM_ENABLE
+            config ALARM_OUTPUT_GPIO
+                int "Alarm output GPIO number"
+                range 0 39
+            config ALARM_TRIGGERED_STATE
+                int "State of a GPIO when alarm is triggered"
+                range 0 1
+                default 1
+                
+        endif
+
     endif
 
 endmenu

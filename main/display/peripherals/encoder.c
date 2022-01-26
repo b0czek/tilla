@@ -1,12 +1,8 @@
-#include <rotary_encoder.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
-#include <esp_log.h>
-
+#include <esp_err.h>
 #include "encoder.h"
 #include "updater.h"
+
+#if ENCODER_ENABLE
 
 #define TAG "encoder"
 
@@ -21,15 +17,34 @@ updater_encoder_t *encoder_init(display_updater_t *updater)
     }
 
     updater_encoder_t *encoder = calloc(1, sizeof(updater_encoder_t));
+    if (!encoder)
+    {
+        return NULL;
+    }
+
     encoder->updater = updater;
     encoder->event_queue = rotary_encoder_create_queue();
 
     rotary_encoder_init(&encoder->info, CONFIG_ENCODER_GPIO_A, CONFIG_ENCODER_GPIO_B);
     rotary_encoder_set_queue(&encoder->info, encoder->event_queue);
 
-    xTaskCreate(handler, "encoder_queue_handler", 2048, encoder, 0, &encoder->queue_handler);
+    xTaskCreate(handler, "encoder_handler", 2048, encoder, 0, &encoder->queue_handler);
 
     return encoder;
+}
+
+void encoder_free(updater_encoder_t *encoder)
+{
+    if (encoder->queue_handler)
+    {
+
+        vTaskDelete(encoder->queue_handler);
+    }
+
+    rotary_encoder_uninit(&encoder->info);
+    vQueueDelete(encoder->event_queue);
+
+    free(encoder);
 }
 
 static void handler(void *arg)
@@ -68,3 +83,5 @@ static void handler(void *arg)
         xSemaphoreGive(updater->xUpdaterSemaphore);
     }
 }
+
+#endif
