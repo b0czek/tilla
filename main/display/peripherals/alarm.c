@@ -6,13 +6,15 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "ets_sys.h"
 
 #if CONFIG_ALARM_ENABLE
 
 #define TAG "alarm"
 
 static void handler(void *arg);
-void toggle_alarm_state(display_updater_t *updater);
+void alarm_set_state(updater_alarm_t *alarm, alarm_state_t state);
+void alarm_toggle_state(updater_alarm_t *alarm);
 int find_triggered_sensor(display_updater_t *updater);
 bool should_alarm_be_engaged(display_updater_t *updater);
 
@@ -53,6 +55,8 @@ updater_alarm_t *alarm_init(_display_updater_t *updater)
     {
         return NULL;
     }
+
+    alarm->state = DISENGAGED;
 
     alarm->updater = updater;
 
@@ -106,39 +110,80 @@ static void handler(void *arg)
             }
         }
         remote_sensor->alarm_triggered = sensor_alarm_triggered;
-        // check if alarm changed state
-        if (should_alarm_be_engaged(updater) != alarm->is_engaged)
+
+        bool desired_state = should_alarm_be_engaged(updater);
+        alarm_state_t prev_state = alarm->state;
+
+        // if alarm was previously disarmed
+        if (alarm->state == DISARMED)
         {
-            toggle_alarm_state(updater);
+            //                          if new sensor's alarm was triggered           or there is no active alarms anymore
+            alarm_state_t new_state = (sensor_alarm_triggered ? ENGAGED : (desired_state == DISENGAGED ? DISENGAGED : DISARMED));
+            // if state changed
+            if (new_state != prev_state)
+            {
+                alarm_set_state(alarm, new_state);
+            }
         }
+        // if alarm was not disarmed, check if it's state should change
+        else if (desired_state != alarm->state)
+        {
+            alarm_toggle_state(alarm);
+        }
+
+        // if state changed to engaged, switch currently displayed sensor to the triggered one
+        if (prev_state != alarm->state && alarm->state == ENGAGED)
+        {
+            // if currently handled sensor's alarm was triggered, set it as active, otherwise use firstly find triggered sensor
+            updater->active_remote_sensor = sensor_alarm_triggered ? sensor_idx : find_triggered_sensor(updater);
+            updater->layout = layout_reload(updater->layout, updater->remote_sensors + updater->active_remote_sensor, updater->xGuiSemaphore);
+        }
+
         xSemaphoreGive(updater->xUpdaterSemaphore);
     }
 }
 
-void toggle_alarm_state(display_updater_t *updater)
+void alarm_set_state(updater_alarm_t *alarm, alarm_state_t state)
 {
-    updater_alarm_t *alarm = updater->peripherals->alarm;
-    alarm->is_engaged = !alarm->is_engaged;
-    ESP_LOGE(TAG, "alarm changed state to %s", alarm->is_engaged ? "true" : "false");
-
+    alarm->state = state;
+    if (!xPortInIsrContext())
+    {
+        ESP_LOGE(TAG, "alarm changed state to %d", alarm->state);
+    }
+    else
+    {
+        ets_printf("alarm changed state to %d", alarm->state);
+    }
+    // xnor
     // ----------------------------------------
-    // | triggered_state | is_engaged | output|
-    // |        0        |      0     |   1   |
-    // |        0        |      1     |   0   |
-    // |        1        |      0     |   0   |
-    // |        1        |      1     |   1   |
+    // | triggered_state |    state   | output|
+    // |        1        |    0(0)    |   0   | disengaged
+    // |        1        |    0(1)    |   1   | engaged
+    // |        1        |    1(0)    |   0   | disarmed
+    // |        0        |    0(0)    |   1   |
+    // |        0        |    0(1)    |   0   |
+    // |        0        |    1(0)    |   1   |
     // ----------------------------------------
-    int8_t output_state = CONFIG_ALARM_TRIGGERED_STATE & alarm->is_engaged;
+    //                                                     get rightmost bit
+    int8_t output_state = CONFIG_ALARM_TRIGGERED_STATE == (alarm->state & 1);
     // set the state on gpio
     gpio_set_level(ALARM_GPIO, output_state);
-    ESP_LOGE(TAG, "alarm gpio output state is %d", output_state);
+}
+// switch state from disarmed or disengaged to engaged and from engaged to disengaged
+void alarm_toggle_state(updater_alarm_t *alarm)
+{
+    alarm_set_state(alarm, !(alarm->state & 1));
+}
 
-    // if alarm is engaged, switch currently displayed sensor to the triggered one
-    if (alarm->is_engaged)
+void alarm_disarm(updater_alarm_t *alarm)
+{
+    // function only works if alarm is engaged
+    if (alarm->state != ENGAGED)
     {
-        updater->active_remote_sensor = find_triggered_sensor(updater);
-        updater->layout = layout_reload(updater->layout, updater->remote_sensors + updater->active_remote_sensor, updater->xGuiSemaphore);
+        return;
     }
+
+    alarm_set_state(alarm, DISARMED);
 }
 
 // finds and returns index of firstly found sensor with alarm triggered set to true
