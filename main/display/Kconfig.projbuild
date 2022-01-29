@@ -11,6 +11,16 @@ menu "Display config"
             int "Maximal vertical resolution to support by the library."
             default 320 
 
+        config DISPLAY_BACKLIGHT_GPIO
+            int "Display backlight control GPIO number"
+            range 0 39
+
+        config DISPLAY_BACKLIGHT_TIMEOUT
+            int "Screensaving timeout[ms]"
+            default 600000
+            help 
+                Time in milliseconds after which the screen turns off if there was no user input in the meantime
+
         config ENCODER_ENABLE 
             bool "Use encoder"
             default y
@@ -25,6 +35,11 @@ menu "Display config"
                 int "Rotary Encoder B output GPIO number"
                 range 0 39
                 default 36
+
+            config ENCODER_GPIO_BUTTON
+                int "Rotary Encoder button GPIO number"
+                range 0 39
+                default 34
         endif
 
         config ALARM_ENABLE
