@@ -6,7 +6,6 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include "ets_sys.h"
 
 #if CONFIG_ALARM_ENABLE
 

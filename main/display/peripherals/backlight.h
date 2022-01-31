@@ -1,7 +1,6 @@
 #pragma once
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "esp_timer.h"
 
 typedef struct display_updater_t _display_updater_t;
@@ -11,6 +10,7 @@ typedef struct display_updater_t _display_updater_t;
 #define BACKLIGHT_TIMEOUT CONFIG_DISPLAY_BACKLIGHT_TIMEOUT
 typedef struct display_backlight_t
 {
+    SemaphoreHandle_t xBacklightSemaphore;
     int16_t state;
     esp_timer_handle_t timer;
 
