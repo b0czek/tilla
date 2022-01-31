@@ -71,10 +71,16 @@ static void button_isr_handler(void *arg)
     if (alarm->state == ENGAGED)
     {
         alarm_disarm(alarm);
+        return;
     }
 #endif
+    BaseType_t xTaskWoken = 0;
+    if (xSemaphoreTakeFromISR(backlight->xBacklightSemaphore, &xTaskWoken) == pdTRUE)
+    {
 
-    backlight_set_state(backlight, (backlight->state + 1) % 2);
+        backlight_set_state(backlight, (backlight->state + 1) % 2);
+        xSemaphoreGiveFromISR(backlight->xBacklightSemaphore, &xTaskWoken);
+    }
 }
 
 static void encoder_handler(void *arg)
@@ -95,15 +101,20 @@ static void encoder_handler(void *arg)
         }
 
         display_backlight_t *backlight = updater->peripherals->backlight;
-        // turn on the screen if encoder was turned
-        if (backlight->state == 0)
+        if (xSemaphoreTake(backlight->xBacklightSemaphore, portMAX_DELAY) == pdTRUE)
         {
-            backlight_set_state(backlight, 1);
-        }
-        // or reset the timer if it was on already
-        else
-        {
-            backlight_reset_timer(backlight);
+
+            // turn on the screen if encoder was turned
+            if (backlight->state == 0)
+            {
+                backlight_set_state(backlight, 1);
+            }
+            // or reset the timer if it was on already
+            else
+            {
+                backlight_reset_timer(backlight);
+            }
+            xSemaphoreGive(backlight->xBacklightSemaphore);
         }
 
         if (updater->remote_sensors_count > 1)

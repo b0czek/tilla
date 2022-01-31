@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include <esp_err.h>
+#include <esp_log.h>
 #include <esp_timer.h>
 
 static void backlight_timeout_cb(void *arg);
@@ -45,11 +46,6 @@ display_backlight_t *backlight_init()
 
 void backlight_set_state(display_backlight_t *backlight, int16_t state)
 {
-    if (xSemaphoreTake(backlight->xBacklightSemaphore, portMAX_DELAY) != pdTRUE)
-    {
-        return;
-    }
-
     backlight->state = state;
     gpio_set_level(BACKLIGHT_GPIO, state);
 
@@ -61,35 +57,25 @@ void backlight_set_state(display_backlight_t *backlight, int16_t state)
     {
         backlight_reset_timer(backlight);
     }
-
-    xSemaphoreGive(backlight->xBacklightSemaphore);
 }
 
 void backlight_reset_timer(display_backlight_t *backlight)
 {
-    if (xSemaphoreTake(backlight->xBacklightSemaphore, portMAX_DELAY) != pdTRUE)
-    {
-        return;
-    }
-
     if (esp_timer_is_active(backlight->timer))
     {
         esp_timer_stop(backlight->timer);
     }
     esp_timer_start_once(backlight->timer, BACKLIGHT_TIMEOUT * 1000);
-
-    xSemaphoreGive(backlight->xBacklightSemaphore);
 }
 
 static void backlight_timeout_cb(void *arg)
 {
     display_backlight_t *backlight = arg;
 
-    if (xSemaphoreTake(backlight->xBacklightSemaphore, portMAX_DELAY) != pdTRUE)
+    if (xSemaphoreTake(backlight->xBacklightSemaphore, portMAX_DELAY) == pdTRUE)
     {
-        return;
-    }
-    backlight_set_state(backlight, 0);
 
-    xSemaphoreGive(backlight->xBacklightSemaphore);
+        backlight_set_state(backlight, 0);
+        xSemaphoreGive(backlight->xBacklightSemaphore);
+    }
 }

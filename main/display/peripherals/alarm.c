@@ -108,6 +108,7 @@ static void handler(void *arg)
                 break;
             }
         }
+        bool alarm_state_changed = remote_sensor->alarm_triggered != sensor_alarm_triggered;
         remote_sensor->alarm_triggered = sensor_alarm_triggered;
 
         bool desired_state = should_alarm_be_engaged(updater);
@@ -117,7 +118,7 @@ static void handler(void *arg)
         if (alarm->state == DISARMED)
         {
             //                          if new sensor's alarm was triggered           or there is no active alarms anymore
-            alarm_state_t new_state = (sensor_alarm_triggered ? ENGAGED : (desired_state == DISENGAGED ? DISENGAGED : DISARMED));
+            alarm_state_t new_state = (alarm_state_changed ? ENGAGED : (desired_state == DISENGAGED ? DISENGAGED : DISARMED));
             // if state changed
             if (new_state != prev_state)
             {
@@ -151,7 +152,7 @@ void alarm_set_state(updater_alarm_t *alarm, alarm_state_t state)
     }
     else
     {
-        ets_printf("alarm changed state to %d", alarm->state);
+        ets_printf("alarm changed state to %d\n", alarm->state);
     }
     // xnor
     // ----------------------------------------
